@@ -169,6 +169,7 @@ type PaymentsPageProps = {
   currency: string;
   onPaymentComplete: (payment: CompletedPayment) => void;
   onNotice: (message: string) => void;
+  onActivityNotification: (title: string, message: string) => void;
 };
 
 export default function PaymentsPage({
@@ -177,6 +178,7 @@ export default function PaymentsPage({
   currency,
   onPaymentComplete,
   onNotice,
+  onActivityNotification,
 }: PaymentsPageProps) {
   const [payments, setPayments] = useState<CompletedPayment[]>([]);
   const [beneficiaries, setBeneficiaries] = useState<PaymentBeneficiary[]>([]);
@@ -473,6 +475,10 @@ export default function PaymentsPage({
     setBeneficiaries((current) => [data as PaymentBeneficiary, ...current]);
     setBeneficiaryDraft(initialBeneficiaryDraft);
     onNotice("Beneficiary saved.");
+    onActivityNotification(
+      "Beneficiary saved",
+      `${name} was added to your saved payment beneficiaries.`,
+    );
   }
 
   async function deleteBeneficiary() {
@@ -492,12 +498,17 @@ export default function PaymentsPage({
       setDeleteTarget(null);
       return;
     }
+    const beneficiaryName = deleteTarget.display_name;
     setBeneficiaries((current) => current.filter(({ id }) => id !== deleteTarget.id));
     if (payment.beneficiaryId === deleteTarget.id) {
       setPayment((current) => ({ ...current, beneficiaryId: "" }));
     }
     setDeleteTarget(null);
     onNotice("Beneficiary deleted.");
+    onActivityNotification(
+      "Beneficiary deleted",
+      `${beneficiaryName} was removed from your saved payment beneficiaries.`,
+    );
   }
 
   function newPayment() {

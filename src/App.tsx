@@ -1228,6 +1228,11 @@ function App() {
       showMessage("Your theme changed, but couldn't be saved on this device.");
     }
     setTheme(nextTheme);
+    void createNotification(
+      "profile",
+      "Appearance updated",
+      `Your app theme was switched to ${nextTheme} mode.`,
+    );
   }
 
   async function handleSubmitSupportRequest(
@@ -1298,6 +1303,11 @@ function App() {
 
     showMessage(
       "Spending limits updated.",
+    );
+    void createNotification(
+      "profile",
+      "Spending limits updated",
+      `Daily limit set to ${formatMoney(dailyLimit)} and monthly limit set to ${formatMoney(monthlyLimit)}.`,
     );
   }
 
@@ -1744,6 +1754,9 @@ function App() {
   const unreadNotificationCount = notifications.filter(
     (notification) => !notification.read_at,
   ).length;
+  const latestUnreadNotification = notifications.find(
+    (notification) => !notification.read_at,
+  );
   const displayName = profileName.trim() || "Customer";
   const initials = displayName
     .split(/\s+/)
@@ -2006,19 +2019,34 @@ function App() {
             <div className="notifications-container" ref={notificationsRef}>
               <button
                 type="button"
-                className="icon-button notification-button"
+                className={`icon-button notification-button ${
+                  unreadNotificationCount > 0 ? "has-unread" : ""
+                }`}
                 aria-label={
                   unreadNotificationCount > 0
-                    ? `Notifications, ${unreadNotificationCount} unread`
+                    ? `Notifications, ${unreadNotificationCount} unread. Latest: ${latestUnreadNotification?.title ?? "New update"}. ${latestUnreadNotification?.message ?? ""}`
+                    : "Notifications"
+                }
+                title={
+                  unreadNotificationCount > 0
+                    ? `${latestUnreadNotification?.title ?? "New update"}${
+                        latestUnreadNotification?.message
+                          ? `: ${latestUnreadNotification.message}`
+                          : ""
+                      }`
                     : "Notifications"
                 }
                 aria-expanded={notificationsOpen}
                 aria-controls="notifications-panel"
                 onClick={() => setNotificationsOpen((open) => !open)}
               >
-                <Bell size={20} />
+                <Bell className="notification-bell-icon" size={20} />
                 {unreadNotificationCount > 0 && (
-                  <span className="notification-count" aria-hidden="true">
+                  <span
+                    className="notification-count"
+                    aria-live="polite"
+                    aria-atomic="true"
+                  >
                     {unreadNotificationCount > 99
                       ? "99+"
                       : unreadNotificationCount}
@@ -2065,6 +2093,9 @@ function App() {
                               : "notification-item unread"
                           }
                         >
+                          <span className="notification-bell-sticker" aria-hidden="true">
+                            <Bell size={15} />
+                          </span>
                           <div className="notification-item-content">
                             <strong>{notification.title}</strong>
                             <p>{notification.message}</p>
@@ -3410,6 +3441,9 @@ function App() {
             currency={currency}
             onPaymentComplete={handlePaymentCompleted}
             onNotice={showMessage}
+            onActivityNotification={(title, message) => {
+              void createNotification("profile", title, message);
+            }}
           />
         )}
 
@@ -3506,8 +3540,14 @@ function App() {
                     aria-pressed={cardFrozen}
                     onClick={() => {
                       setCardFrozen((frozen) => !frozen);
-                      showMessage(
-                        cardFrozen ? "Card unfrozen." : "Card frozen.",
+                      const message = cardFrozen
+                        ? "Card unfrozen."
+                        : "Card frozen.";
+                      showMessage(message);
+                      void createNotification(
+                        "profile",
+                        cardFrozen ? "Card unfrozen" : "Card frozen",
+                        message,
                       );
                     }}
                   >
