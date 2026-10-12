@@ -5,32 +5,6 @@
   padding-bottom: 40px;
 }
 
-.investment-disclosure-note {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  padding: 14px 17px;
-  color: #33425d;
-  background: #fff9e9;
-  border: 1px solid #eee1bf;
-  border-radius: 13px;
-}
-
-.investment-disclosure-note > svg {
-  flex: 0 0 auto;
-  margin-top: 2px;
-  color: #a77e2d;
-}
-
-.investment-disclosure-note p {
-  margin: 0;
-  font-size: 13px;
-}
-
-.investment-disclosure-note strong {
-  color: var(--navy);
-}
-
 .investment-metrics {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -813,13 +787,6 @@
   clip-path: inset(50%);
 }
 
-[data-theme="dark"] .investment-disclosure-note {
-  color: #e0d7c2;
-  background: #302b20;
-  border-color: #51452a;
-}
-
-[data-theme="dark"] .investment-disclosure-note strong,
 [data-theme="dark"] .investment-metric-card:not(.featured) > strong,
 [data-theme="dark"] .investment-donut > span,
 [data-theme="dark"] .investment-product-stats strong,

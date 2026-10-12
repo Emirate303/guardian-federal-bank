@@ -8,7 +8,6 @@ import {
   Pencil,
   Plus,
   Search,
-  ShieldCheck,
   Target,
   TrendingUp,
   Trash2,
@@ -744,16 +743,6 @@ export default function InvestmentsPage({
 
   return (
     <section className="page-content investments-page">
-      <div className="investment-disclosure-note" role="note">
-        <ShieldCheck size={19} />
-        <p>
-          <strong>Illustrative information only.</strong> Products, rates, values, and
-          performance are estimates, not live offers or actual account holdings. No
-          trades are placed and your bank balance is never changed. Returns are not
-          guaranteed.
-        </p>
-      </div>
-
       {loadError && (
         <div className="investment-error" role="alert">
           <span>{loadError}</span>
