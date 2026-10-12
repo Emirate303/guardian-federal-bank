@@ -41,6 +41,7 @@ import {
 import "./index.css";
 import Auth from "./Auth";
 import InvestmentsPage from "./InvestmentsPage";
+import PaymentsPage, { type CompletedPayment } from "./PaymentsPage";
 import { supabase } from "./lib/supabase";
 
 type DatabaseTransaction = {
@@ -339,6 +340,7 @@ function App() {
   >([]);
   const [transactionsLoading, setTransactionsLoading] = useState(false);
   const [transactionsError, setTransactionsError] = useState("");
+  const [paymentActivityError, setPaymentActivityError] = useState("");
   const [supportTickets, setSupportTickets] = useState<SupportTicket[]>([]);
   const [supportTicketsLoading, setSupportTicketsLoading] = useState(false);
   const [supportTicketsError, setSupportTicketsError] = useState("");
@@ -747,6 +749,7 @@ function App() {
       if (!session?.user) {
         setDatabaseTransactions([]);
         setTransactionsError("");
+        setPaymentActivityError("");
         setTransactionsLoading(false);
         return;
       }
@@ -754,33 +757,72 @@ function App() {
       setTransactionsLoading(true);
       setTransactionsError("");
 
-      const { data, error } = await supabase
-        .from("transactions")
-        .select(
-          "id, description, amount, transaction_type, status, created_at",
-        )
-        .eq("user_id", session.user.id)
-        .order("created_at", { ascending: false });
+      const [transactionResult, paymentResult] = await Promise.all([
+        supabase
+          .from("transactions")
+          .select(
+            "id, description, amount, transaction_type, status, created_at",
+          )
+          .eq("user_id", session.user.id)
+          .order("created_at", { ascending: false }),
+        supabase
+          .from("payments")
+          .select("id, reference, category, provider, recipient, amount, status, created_at")
+          .eq("user_id", session.user.id)
+          .order("created_at", { ascending: false }),
+      ]);
 
       if (cancelled) return;
 
-      if (error) {
+      if (transactionResult.error) {
         setDatabaseTransactions([]);
         setTransactionsError(
           "We couldn't load your transactions. Please refresh and try again.",
         );
+        if (paymentResult.error) {
+          console.error("Unable to load payment activity.", paymentResult.error);
+          setPaymentActivityError(
+            "Payment activity could not be loaded. Apply the payments migration in Supabase and refresh.",
+          );
+        } else {
+          setPaymentActivityError("");
+        }
       } else {
         try {
-          const serverTransactions = (data ?? []) as DatabaseTransaction[];
+          const serverTransactions = (transactionResult.data ?? []) as DatabaseTransaction[];
+          const paymentTransactions: DatabaseTransaction[] = paymentResult.error
+            ? []
+            : (paymentResult.data ?? []).map((payment) => ({
+                id: payment.reference,
+                description: `${payment.category} payment · ${payment.provider} · ${payment.recipient}`,
+                amount: payment.amount,
+                transaction_type: "debit" as const,
+                status: payment.status,
+                created_at: payment.created_at,
+              }));
           const savedTransfers = readSavedTransfers(session.user.id);
-          const serverIds = new Set(serverTransactions.map(({ id }) => id));
+          const allServerTransactions = [
+            ...serverTransactions,
+            ...paymentTransactions,
+          ];
+          const serverIds = new Set(allServerTransactions.map(({ id }) => id));
           setDatabaseTransactions([
             ...savedTransfers.filter(({ id }) => !serverIds.has(id)),
-            ...serverTransactions,
-          ]);
+            ...allServerTransactions,
+          ].sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at)));
+          if (paymentResult.error) {
+            console.error("Unable to load payment activity.", paymentResult.error);
+            setPaymentActivityError(
+              "Payment activity could not be loaded. Apply the payments migration in Supabase and refresh.",
+            );
+          } else {
+            setPaymentActivityError("");
+          }
         } catch (storageError) {
           console.error("Unable to restore saved transfers.", storageError);
-          setDatabaseTransactions((data ?? []) as DatabaseTransaction[]);
+          setDatabaseTransactions(
+            (transactionResult.data ?? []) as DatabaseTransaction[],
+          );
           setTransactionsError(
             "We couldn't restore your saved transfers. Clear local site data or contact support.",
           );
@@ -1060,6 +1102,61 @@ function App() {
 
   function showMessage(message: string) {
     setNotice(message);
+  }
+
+  function handlePaymentCompleted(payment: CompletedPayment) {
+    try {
+      const savedTransfers = readSavedTransfers(session?.user.id ?? "");
+      const transferredCents = savedTransfers.reduce(
+        (total, transaction) =>
+          total + Math.round(Number(transaction.amount) * 100),
+        0,
+      );
+      setCustomerAccount((account) =>
+        account
+          ? {
+              ...account,
+              balance:
+                (Math.round(Number(payment.balance_after) * 100) -
+                  transferredCents) /
+                100,
+            }
+          : account,
+      );
+      setAccountError("");
+    } catch (storageError) {
+      console.error(
+        "Payment completed, but saved transfer balances could not be reconciled.",
+        storageError,
+      );
+      setAccountError(
+        "Your payment completed, but the account balance display couldn't be reconciled with saved transfers. Refresh to reload it.",
+      );
+    }
+    const transaction: DatabaseTransaction = {
+      id: payment.reference,
+      description: `${payment.category} payment · ${payment.provider} · ${payment.recipient}`,
+      amount: payment.amount,
+      transaction_type: "debit",
+      status: payment.status,
+      created_at: payment.created_at,
+    };
+    setDatabaseTransactions((current) =>
+      current.some(({ id }) => id === transaction.id)
+        ? current
+        : [transaction, ...current],
+    );
+    setSearch("");
+    setTransactionSearch("");
+    setTransactionTypeFilter("all");
+    setTransactionStatusFilter("all");
+    setTransactionStartDate("");
+    setTransactionEndDate("");
+    void createNotification(
+      "transaction",
+      "Payment confirmed",
+      `${formatMoney(Number(payment.amount))} payment to ${payment.provider} recorded. Reference ${payment.reference}.`,
+    );
   }
 
   async function createNotification(
@@ -2018,6 +2115,8 @@ function App() {
                   ? "View your account information."
                   : activePage === "Investments"
                     ? "Explore simulated investments and track your goals."
+                    : activePage === "Payments"
+                      ? "Pay bills, manage beneficiaries, and review payment activity."
                   : activePage === "Transactions"
                     ? "Review and filter your transaction history."
                     : activePage === "My Profile"
@@ -2669,6 +2768,11 @@ function App() {
         {activePage === "Transactions" && (
           <section className="page-content transactions-content">
             <section className="panel transactions-panel">
+              {paymentActivityError && (
+                <p className="payment-activity-warning" role="alert">
+                  {paymentActivityError}
+                </p>
+              )}
               <div className="panel-header">
                 <div>
                   <h2>Transaction history</h2>
@@ -3299,25 +3403,14 @@ function App() {
           </section>
         )}
 
-        {activePage === "Payments" && (
-          <section className="page-content">
-            <section className="panel placeholder-panel">
-              <div className="placeholder-icon">
-                <CreditCard size={27} />
-              </div>
-              <h2>Payments</h2>
-              <p>
-                Bill payments are currently unavailable.
-              </p>
-              <button
-                type="button"
-                className="button-secondary"
-                onClick={() => navigate("Accounts")}
-              >
-                View account
-              </button>
-            </section>
-          </section>
+        {activePage === "Payments" && session?.user && (
+          <PaymentsPage
+            userId={session.user.id}
+            accountBalance={customerAccount?.balance ?? null}
+            currency={currency}
+            onPaymentComplete={handlePaymentCompleted}
+            onNotice={showMessage}
+          />
         )}
 
         {activePage === "Cards" && (

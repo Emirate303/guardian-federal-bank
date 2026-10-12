@@ -15,7 +15,8 @@ create table public.payment_beneficiaries (
   ),
   provider text not null check (char_length(provider) between 1 and 100),
   recipient text not null check (char_length(recipient) between 1 and 160),
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  unique (user_id, category, provider, recipient)
 );
 
 create index payment_beneficiaries_user_created_at_idx
@@ -51,6 +52,7 @@ create table public.payments (
   user_id uuid not null references auth.users (id) on delete cascade,
   account_id uuid not null references public.accounts (id) on delete restrict,
   beneficiary_id uuid references public.payment_beneficiaries (id) on delete set null,
+  idempotency_key uuid not null,
   reference text not null unique,
   category text not null check (
     category in (
@@ -67,9 +69,11 @@ create table public.payments (
   recipient text not null check (char_length(recipient) between 1 and 160),
   plan text check (plan is null or char_length(plan) <= 160),
   amount numeric(14, 2) not null check (amount between 0.01 and 10000000),
+  balance_after numeric(18, 2) not null check (balance_after >= 0),
   status text not null default 'completed'
     check (status in ('pending', 'completed', 'failed')),
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  unique (user_id, idempotency_key)
 );
 
 create index payments_user_created_at_idx
@@ -92,7 +96,8 @@ create or replace function public.submit_payment(
   p_recipient text,
   p_amount numeric,
   p_plan text default null,
-  p_beneficiary_id uuid default null
+  p_beneficiary_id uuid default null,
+  p_idempotency_key uuid default null
 )
 returns jsonb
 language plpgsql
@@ -102,17 +107,18 @@ as $$
 declare
   v_user_id uuid := auth.uid();
   v_account_id uuid;
-  v_balance numeric(14, 2);
+  v_balance numeric(18, 2);
   v_amount numeric(14, 2);
   v_payment_id uuid := gen_random_uuid();
   v_reference text;
+  v_existing public.payments%rowtype;
   v_payment public.payments%rowtype;
 begin
   if v_user_id is null then
     raise exception 'AUTHENTICATION_REQUIRED' using errcode = 'P0001';
   end if;
 
-  if p_category not in (
+  if p_category is null or p_category not in (
     'electricity', 'water', 'internet', 'television', 'other', 'airtime', 'data'
   ) then
     raise exception 'INVALID_PAYMENT_CATEGORY' using errcode = 'P0001';
@@ -133,16 +139,8 @@ begin
   end if;
   v_amount := p_amount;
 
-  if p_beneficiary_id is not null and not exists (
-    select 1
-    from public.payment_beneficiaries b
-    where b.id = p_beneficiary_id
-      and b.user_id = v_user_id
-      and b.category = p_category
-      and b.provider = btrim(p_provider)
-      and b.recipient = btrim(p_recipient)
-  ) then
-    raise exception 'INVALID_PAYMENT_BENEFICIARY' using errcode = 'P0001';
+  if p_idempotency_key is null then
+    raise exception 'IDEMPOTENCY_KEY_REQUIRED' using errcode = 'P0001';
   end if;
 
   select a.id, a.balance
@@ -157,6 +155,48 @@ begin
     raise exception 'ACCOUNT_NOT_FOUND' using errcode = 'P0001';
   end if;
 
+  select *
+    into v_existing
+  from public.payments
+  where user_id = v_user_id
+    and idempotency_key = p_idempotency_key;
+
+  if found then
+    if v_existing.category <> p_category
+       or v_existing.provider <> btrim(p_provider)
+       or v_existing.recipient <> btrim(p_recipient)
+       or v_existing.amount <> v_amount
+       or v_existing.plan is distinct from nullif(btrim(p_plan), '')
+       or v_existing.beneficiary_id is distinct from p_beneficiary_id then
+      raise exception 'IDEMPOTENCY_KEY_REUSED' using errcode = 'P0001';
+    end if;
+    return jsonb_build_object(
+      'id', v_existing.id,
+      'reference', v_existing.reference,
+      'account_id', v_existing.account_id,
+      'balance_after', v_balance,
+      'category', v_existing.category,
+      'provider', v_existing.provider,
+      'recipient', v_existing.recipient,
+      'plan', v_existing.plan,
+      'amount', v_existing.amount,
+      'status', v_existing.status,
+      'created_at', v_existing.created_at
+    );
+  end if;
+
+  if p_beneficiary_id is not null and not exists (
+    select 1
+    from public.payment_beneficiaries b
+    where b.id = p_beneficiary_id
+      and b.user_id = v_user_id
+      and b.category = p_category
+      and b.provider = btrim(p_provider)
+      and b.recipient = btrim(p_recipient)
+  ) then
+    raise exception 'INVALID_PAYMENT_BENEFICIARY' using errcode = 'P0001';
+  end if;
+
   if v_balance < v_amount then
     raise exception 'INSUFFICIENT_FUNDS' using errcode = 'P0001';
   end if;
@@ -167,7 +207,7 @@ begin
     and user_id = v_user_id
   returning balance into v_balance;
 
-  v_reference := 'PAY-' || upper(substr(replace(v_payment_id::text, '-', ''), 1, 12));
+  v_reference := 'PAY-' || upper(replace(v_payment_id::text, '-', ''));
 
   insert into public.payments (
     id,
@@ -180,6 +220,7 @@ begin
     recipient,
     plan,
     amount,
+    balance_after,
     status
   )
   values (
@@ -193,6 +234,7 @@ begin
     btrim(p_recipient),
     nullif(btrim(p_plan), ''),
     v_amount,
+    v_balance,
     'completed'
   )
   returning * into v_payment;
@@ -201,7 +243,7 @@ begin
     'id', v_payment.id,
     'reference', v_payment.reference,
     'account_id', v_payment.account_id,
-    'balance_after', v_balance,
+    'balance_after', v_payment.balance_after,
     'category', v_payment.category,
     'provider', v_payment.provider,
     'recipient', v_payment.recipient,
@@ -213,7 +255,7 @@ begin
 end;
 $$;
 
-revoke all on function public.submit_payment(text, text, text, numeric, text, uuid)
+revoke all on function public.submit_payment(text, text, text, numeric, text, uuid, uuid)
   from public, anon, authenticated;
-grant execute on function public.submit_payment(text, text, text, numeric, text, uuid)
+grant execute on function public.submit_payment(text, text, text, numeric, text, uuid, uuid)
   to authenticated;
