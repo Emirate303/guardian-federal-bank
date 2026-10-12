@@ -3255,6 +3255,765 @@ h4 {
   }
 }
 
+/* ---------- 28. Theme, profile avatar, and dashboard customization ---------- */
+
+.topbar-profile-avatar {
+  overflow: hidden;
+}
+
+.topbar-profile-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.theme-toggle {
+  color: #8a6c2e;
+}
+
+.widget-customizer {
+  position: relative;
+  z-index: 10;
+  flex: 0 0 auto;
+}
+
+.widget-customizer-toggle {
+  gap: 8px;
+  white-space: nowrap;
+}
+
+.widget-customizer-menu {
+  position: absolute;
+  top: calc(100% + 9px);
+  right: 0;
+  z-index: 20;
+  display: flex;
+  width: min(290px, calc(100vw - 36px));
+  flex-direction: column;
+  gap: 4px;
+  padding: 13px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+}
+
+.widget-customizer-menu > strong {
+  padding: 3px 6px 8px;
+  color: var(--navy);
+  font-size: 12px;
+}
+
+.widget-customizer-menu label {
+  display: flex;
+  align-items: center;
+  min-height: 36px;
+  gap: 9px;
+  padding: 5px 7px;
+  color: var(--text);
+  border-radius: 7px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.widget-customizer-menu label:hover {
+  background: var(--page-bg);
+}
+
+.widget-customizer-menu input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--navy);
+}
+
+.app-shell[data-theme="dark"] {
+  --navy: #e4ebf7;
+  --page-bg: #0d1523;
+  --surface: #172235;
+  --text: #e0e7f2;
+  --muted: #a0aec2;
+  --border: #2b3950;
+  --success: #69d3a4;
+  --success-bg: #19392f;
+  --danger: #f08b8b;
+  --danger-bg: #3c252b;
+  --warning: #e6c36d;
+  --warning-bg: #3c3422;
+  --shadow: 0 8px 28px rgb(0 0 0 / 18%);
+  background: var(--page-bg);
+  color: var(--text);
+  color-scheme: dark;
+}
+
+.app-shell[data-theme="dark"] .main-content {
+  background: var(--page-bg);
+}
+
+.app-shell[data-theme="dark"] .panel,
+.app-shell[data-theme="dark"] .summary-card,
+.app-shell[data-theme="dark"] .balance-card-light,
+.app-shell[data-theme="dark"] .dashboard-filter-bar,
+.app-shell[data-theme="dark"] .page-heading-date,
+.app-shell[data-theme="dark"] .search-box,
+.app-shell[data-theme="dark"] .icon-button,
+.app-shell[data-theme="dark"] .account-detail,
+.app-shell[data-theme="dark"] .account-type-row,
+.app-shell[data-theme="dark"] .card-details-grid > div,
+.app-shell[data-theme="dark"] .card-spend-summary > div,
+.app-shell[data-theme="dark"] .quick-action,
+.app-shell[data-theme="dark"] .account-detail-grid .account-detail:first-child,
+.app-shell[data-theme="dark"] .transaction-detail-dialog,
+.app-shell[data-theme="dark"] .widget-customizer-menu {
+  color: var(--text);
+  background-color: var(--surface);
+  border-color: var(--border);
+}
+
+.app-shell[data-theme="dark"] h1,
+.app-shell[data-theme="dark"] h2,
+.app-shell[data-theme="dark"] h3,
+.app-shell[data-theme="dark"] h4,
+.app-shell[data-theme="dark"] .panel-header h2,
+.app-shell[data-theme="dark"] .panel-header h3,
+.app-shell[data-theme="dark"] .stat-card-content h3,
+.app-shell[data-theme="dark"] .account-detail strong,
+.app-shell[data-theme="dark"] .account-type-row strong,
+.app-shell[data-theme="dark"] .widget-customizer-menu > strong {
+  color: var(--navy);
+}
+
+.app-shell[data-theme="dark"] .search-box input,
+.app-shell[data-theme="dark"] .dashboard-custom-dates input,
+.app-shell[data-theme="dark"] .transaction-filter-select,
+.app-shell[data-theme="dark"] .transaction-search-input,
+.app-shell[data-theme="dark"] .profile-field input,
+.app-shell[data-theme="dark"] .profile-field select,
+.app-shell[data-theme="dark"] .profile-field textarea,
+.app-shell[data-theme="dark"] .card-limit-input,
+.app-shell[data-theme="dark"] .card-limit-input input,
+.app-shell[data-theme="dark"] .support-faq-search {
+  color: var(--text);
+  background-color: #101a2a;
+  border-color: var(--border);
+}
+
+.app-shell[data-theme="dark"] .button-secondary,
+.app-shell[data-theme="dark"] .secondary-button {
+  color: var(--text);
+  background: #202d42;
+  border-color: var(--border);
+}
+
+.app-shell[data-theme="dark"] .button-secondary:hover:not(:disabled),
+.app-shell[data-theme="dark"] .secondary-button:hover:not(:disabled) {
+  color: #fff;
+  background: #2a3b55;
+  border-color: #455a78;
+}
+
+.app-shell[data-theme="dark"] .primary-button,
+.app-shell[data-theme="dark"] .button-primary {
+  color: #fff;
+  background: #304a73;
+  border-color: #405d89;
+}
+
+.app-shell[data-theme="dark"] .primary-button:hover:not(:disabled),
+.app-shell[data-theme="dark"] .button-primary:hover:not(:disabled) {
+  background: #3a5886;
+  border-color: #496b9f;
+}
+
+.app-shell[data-theme="dark"] .dashboard-range-options,
+.app-shell[data-theme="dark"] .dashboard-range-button.active,
+.app-shell[data-theme="dark"] .dashboard-range-button:hover,
+.app-shell[data-theme="dark"] .account-detail-hero,
+.app-shell[data-theme="dark"] .transaction-detail-amount,
+.app-shell[data-theme="dark"] .category-progress,
+.app-shell[data-theme="dark"] .card-limit-progress {
+  color: var(--text);
+  background-color: #202d42;
+}
+
+.app-shell[data-theme="dark"] .dashboard-range-button,
+.app-shell[data-theme="dark"] .support-faq-item > p,
+.app-shell[data-theme="dark"] .support-ticket > p {
+  color: var(--muted);
+}
+
+.app-shell[data-theme="dark"] .dashboard-range-button.active {
+  color: var(--text);
+}
+
+.app-shell[data-theme="dark"] .transaction-row:hover,
+.app-shell[data-theme="dark"] .transaction-row:focus-visible,
+.app-shell[data-theme="dark"] .quick-action:hover {
+  background: #202d42;
+}
+
+.app-shell[data-theme="dark"] .transaction-info strong,
+.app-shell[data-theme="dark"] .transaction-amount,
+.app-shell[data-theme="dark"] .transaction-detail-list dd {
+  color: var(--text);
+}
+
+.app-shell[data-theme="dark"] .account-detail-row,
+.app-shell[data-theme="dark"] .transaction-row,
+.app-shell[data-theme="dark"] .support-faq-item,
+.app-shell[data-theme="dark"] .support-ticket {
+  border-color: var(--border);
+}
+
+.app-shell[data-theme="dark"] .account-status-badge.active {
+  color: var(--success);
+  background: var(--success-bg);
+}
+
+.app-shell[data-theme="dark"] .account-status-badge.unavailable {
+  color: var(--danger);
+  background: var(--danger-bg);
+}
+
+.app-shell[data-theme="dark"] .transaction-status.completed {
+  color: var(--success);
+  background: var(--success-bg);
+}
+
+.app-shell[data-theme="dark"] .transaction-status.pending {
+  color: var(--warning);
+  background: var(--warning-bg);
+}
+
+.app-shell[data-theme="dark"] .transaction-status.failed {
+  color: var(--danger);
+  background: var(--danger-bg);
+}
+
+.app-shell[data-theme="dark"] .chart-empty-state,
+.app-shell[data-theme="dark"] .empty-state,
+.app-shell[data-theme="dark"] .account-notice,
+.app-shell[data-theme="dark"] .notice-banner {
+  color: var(--text);
+  background-color: var(--surface);
+  border-color: var(--border);
+}
+
+.app-shell[data-theme="dark"] .chart-empty-state {
+  background: #121d2e;
+  border-color: var(--border);
+}
+
+.app-shell[data-theme="dark"] .cashflow-chart line,
+.app-shell[data-theme="dark"] .balance-trend-chart line {
+  stroke: #314059;
+}
+
+.app-shell[data-theme="dark"] .cashflow-chart text,
+.app-shell[data-theme="dark"] .balance-trend-chart text {
+  fill: #aab6c9;
+}
+
+.app-shell[data-theme="dark"] .card-freeze-button {
+  color: #f0aaaa;
+  background: var(--surface);
+  border-color: #5a3940;
+}
+
+.app-shell[data-theme="dark"] .card-freeze-button.is-frozen {
+  color: var(--success);
+  border-color: #315443;
+}
+
+/* ---------- 29. Transfer availability ---------- */
+
+.transfer-content {
+  display: flex;
+  flex-direction: column;
+  gap: 17px;
+}
+
+.transfer-unavailable-panel {
+  display: flex;
+  width: 100%;
+  max-width: 620px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 25px;
+}
+
+.transfer-unavailable-icon {
+  display: grid;
+  width: 50px;
+  height: 50px;
+  margin-bottom: 4px;
+  place-items: center;
+  color: #8a6c2e;
+  background: #fbf7ed;
+  border: 1px solid #eee2c5;
+  border-radius: 13px;
+}
+
+.transfer-unavailable-panel h2 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.transfer-unavailable-panel p {
+  max-width: 440px;
+  margin: 0 0 7px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.transfer-unavailable-panel button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.app-shell[data-theme="dark"] .transfer-unavailable-icon {
+  color: var(--gold-light);
+  background: #322c1e;
+  border-color: #51462c;
+}
+
+.transfer-demo-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  color: #6c5729;
+  background: #fbf7ed;
+  border: 1px solid #eee2c5;
+  border-radius: 12px;
+}
+
+.transfer-demo-notice > svg {
+  flex: 0 0 auto;
+  margin-top: 2px;
+  color: #9a7937;
+}
+
+.transfer-demo-notice p {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  font-size: 12px;
+}
+
+.transfer-demo-notice strong {
+  color: #5d4921;
+}
+
+.transfer-steps {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.transfer-steps li {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: 9px;
+  padding: 10px 12px;
+  color: var(--muted);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.transfer-steps li > span {
+  display: grid;
+  width: 23px;
+  height: 23px;
+  flex: 0 0 23px;
+  place-items: center;
+  color: var(--muted);
+  background: var(--page-bg);
+  border-radius: 50%;
+  font-size: 10px;
+}
+
+.transfer-steps li.active {
+  color: var(--navy);
+  border-color: var(--gold);
+}
+
+.transfer-steps li.active > span,
+.transfer-steps li.complete > span {
+  color: var(--navy-dark);
+  background: var(--gold-light);
+}
+
+.transfer-panel {
+  width: 100%;
+  max-width: 760px;
+  padding: 22px;
+}
+
+.transfer-panel .panel-header {
+  margin-bottom: 19px;
+}
+
+.transfer-panel .panel-header > svg {
+  color: #9a7937;
+}
+
+.transfer-source-account {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-bottom: 20px;
+  padding: 13px 15px;
+  background: var(--page-bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.transfer-source-account > span:first-child {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.transfer-source-account strong {
+  color: var(--navy);
+  font-size: 13px;
+}
+
+.transfer-source-account > span:last-child {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.transfer-account-message {
+  margin: 0 0 18px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.transfer-form-fields {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 19px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.transfer-form-fields:disabled {
+  opacity: 0.58;
+}
+
+.transfer-form-fields legend {
+  width: 100%;
+  margin-bottom: 11px;
+  padding: 0;
+  color: var(--navy);
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.transfer-form-fields legend span {
+  margin-left: 5px;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 500;
+}
+
+.beneficiary-list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.beneficiary-option {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: 10px;
+  padding: 12px 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  cursor: pointer;
+  transition: border-color 150ms ease, background-color 150ms ease;
+}
+
+.beneficiary-option:hover,
+.beneficiary-option.selected {
+  background: #fcfaf5;
+  border-color: var(--gold);
+}
+
+.beneficiary-option input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+
+.beneficiary-option:focus-within {
+  outline: 3px solid var(--gold);
+  outline-offset: 2px;
+}
+
+.beneficiary-avatar {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  flex: 0 0 36px;
+  place-items: center;
+  color: var(--navy);
+  background: #f2ead6;
+  border-radius: 50%;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.beneficiary-copy {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.beneficiary-copy strong {
+  overflow: hidden;
+  color: var(--navy);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.beneficiary-copy small {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 9px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.beneficiary-option > svg {
+  display: none;
+  flex: 0 0 auto;
+  color: var(--success);
+}
+
+.beneficiary-option.selected > svg {
+  display: block;
+}
+
+.transfer-amount-field {
+  max-width: 360px;
+}
+
+.transfer-panel > .notice {
+  margin-top: 16px;
+}
+
+.transfer-form-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 21px;
+}
+
+.transfer-form-actions button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.transfer-review-list {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  border-top: 1px solid var(--border);
+}
+
+.transfer-review-list > div {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 14px 2px;
+  border-bottom: 1px solid var(--border);
+}
+
+.transfer-review-list dt {
+  flex: 0 0 auto;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.transfer-review-list dd {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  color: var(--navy);
+  font-size: 12px;
+  font-weight: 700;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+.transfer-review-list dd span {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 500;
+}
+
+.transfer-review-list .transfer-review-amount {
+  font-size: 17px;
+}
+
+.transfer-confirmation {
+  text-align: center;
+}
+
+.transfer-confirmation-icon {
+  display: grid;
+  width: 58px;
+  height: 58px;
+  margin: 2px auto 14px;
+  place-items: center;
+  color: var(--success);
+  background: var(--success-bg);
+  border-radius: 50%;
+}
+
+.transfer-confirmation > h2 {
+  margin-bottom: 6px;
+  font-size: 20px;
+}
+
+.transfer-confirmation > p {
+  max-width: 510px;
+  margin: 0 auto 20px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.transfer-confirmation .transfer-review-list {
+  text-align: left;
+}
+
+.app-shell[data-theme="dark"] .transfer-demo-notice {
+  color: #e5d5ad;
+  background: #322c1e;
+  border-color: #51462c;
+}
+
+.app-shell[data-theme="dark"] .transfer-demo-notice strong {
+  color: #f0dfb6;
+}
+
+.app-shell[data-theme="dark"] .transfer-steps li,
+.app-shell[data-theme="dark"] .transfer-source-account,
+.app-shell[data-theme="dark"] .beneficiary-option {
+  color: var(--text);
+  background-color: var(--surface);
+  border-color: var(--border);
+}
+
+.app-shell[data-theme="dark"] .transfer-steps li.active,
+.app-shell[data-theme="dark"] .beneficiary-option.selected {
+  border-color: var(--gold);
+}
+
+.app-shell[data-theme="dark"] .beneficiary-option:hover,
+.app-shell[data-theme="dark"] .beneficiary-option.selected {
+  background: #202d42;
+}
+
+.app-shell[data-theme="dark"] .transfer-source-account strong,
+.app-shell[data-theme="dark"] .transfer-form-fields legend,
+.app-shell[data-theme="dark"] .beneficiary-copy strong,
+.app-shell[data-theme="dark"] .transfer-review-list dd {
+  color: var(--text);
+}
+
+@media (max-width: 760px) {
+  .beneficiary-list {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 520px) {
+  .transfer-steps {
+    gap: 6px;
+  }
+
+  .transfer-steps li {
+    flex-direction: column;
+    justify-content: center;
+    gap: 5px;
+    padding: 9px 5px;
+    text-align: center;
+    font-size: 9px;
+  }
+
+  .transfer-panel {
+    padding: 16px;
+  }
+
+  .transfer-form-actions {
+    align-items: stretch;
+    flex-direction: column-reverse;
+  }
+
+  .transfer-form-actions button {
+    width: 100%;
+  }
+
+  .transfer-review-list > div {
+    gap: 12px;
+  }
+}
+
+@media (max-width: 768px) {
+  .widget-customizer {
+    margin-left: auto;
+  }
+}
+
+@media (max-width: 480px) {
+  .welcome-row {
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .widget-customizer-toggle {
+    min-height: 38px;
+    gap: 5px;
+    padding: 8px;
+    font-size: 11px;
+  }
+
+  .widget-customizer-menu {
+    right: 0;
+  }
+}
+
 /* ---------- 27. Customer support ---------- */
 
 .support-content {

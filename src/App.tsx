@@ -19,18 +19,18 @@ import {
   EyeOff,
   FileText,
   Headset,
-  Home,
   Landmark,
   LockKeyhole,
   LogOut,
+  Moon,
   Search,
   Send,
   Settings,
   ShieldCheck,
   Snowflake,
   SlidersHorizontal,
-  Sparkles,
   TrendingUp,
+  Sun,
   UserRound,
   Wallet,
   X,
@@ -38,6 +38,9 @@ import {
 import "./index.css";
 import Auth from "./Auth";
 import { supabase } from "./lib/supabase";
+
+void Activity;
+void TrendingUp;
 
 type DatabaseTransaction = {
   id: string;
@@ -64,7 +67,6 @@ type GeneratedCardDetails = {
 };
 
 type PageName =
-  | "Overview"
   | "Accounts"
   | "Transactions"
   | "Transfers"
@@ -84,6 +86,19 @@ type SupportTicket = {
 };
 
 type DashboardRange = "30d" | "90d" | "6m" | "12m" | "custom";
+type ThemePreference = "light" | "dark";
+
+type DashboardWidgets = {
+  balance: boolean;
+  income: boolean;
+  spending: boolean;
+  cashflow: boolean;
+  balanceTrend: boolean;
+  activity: boolean;
+  categories: boolean;
+  account: boolean;
+  quickActions: boolean;
+};
 
 type MonthlyActivity = {
   date: Date;
@@ -142,7 +157,7 @@ const supportFaqs = [
   {
     question: "Can I make a transfer or payment?",
     answer:
-      "Transfers and payments are not available in this online banking service. No money can be moved or payments made here.",
+      "Online transfers and bill payments are not currently available. Contact customer support if you need help.",
     keywords: "transfer bill payment send money",
   },
   {
@@ -170,6 +185,81 @@ const supportFaqs = [
     keywords: "contact support help ticket customer service",
   },
 ];
+
+const defaultDashboardWidgets: DashboardWidgets = {
+  balance: true,
+  income: true,
+  spending: true,
+  cashflow: true,
+  balanceTrend: true,
+  activity: true,
+  categories: true,
+  account: true,
+  quickActions: true,
+};
+
+function readThemePreference(): ThemePreference {
+  try {
+    return localStorage.getItem("guardian-theme") === "dark" ? "dark" : "light";
+  } catch (error) {
+    console.error("Unable to read the saved theme preference.", error);
+    return "light";
+  }
+}
+
+function readDashboardWidgets(): DashboardWidgets {
+  try {
+    const stored = localStorage.getItem("guardian-dashboard-widgets");
+    if (!stored) return defaultDashboardWidgets;
+
+    const parsed: unknown = JSON.parse(stored);
+    if (!parsed || typeof parsed !== "object") return defaultDashboardWidgets;
+
+    const saved = parsed as Partial<DashboardWidgets>;
+
+    return {
+      balance:
+        typeof saved.balance === "boolean"
+          ? saved.balance
+          : defaultDashboardWidgets.balance,
+      income:
+        typeof saved.income === "boolean"
+          ? saved.income
+          : defaultDashboardWidgets.income,
+      spending:
+        typeof saved.spending === "boolean"
+          ? saved.spending
+          : defaultDashboardWidgets.spending,
+      cashflow:
+        typeof saved.cashflow === "boolean"
+          ? saved.cashflow
+          : defaultDashboardWidgets.cashflow,
+      balanceTrend:
+        typeof saved.balanceTrend === "boolean"
+          ? saved.balanceTrend
+          : defaultDashboardWidgets.balanceTrend,
+      activity:
+        typeof saved.activity === "boolean"
+          ? saved.activity
+          : defaultDashboardWidgets.activity,
+      categories:
+        typeof saved.categories === "boolean"
+          ? saved.categories
+          : defaultDashboardWidgets.categories,
+      account:
+        typeof saved.account === "boolean"
+          ? saved.account
+          : defaultDashboardWidgets.account,
+      quickActions:
+        typeof saved.quickActions === "boolean"
+          ? saved.quickActions
+          : defaultDashboardWidgets.quickActions,
+    };
+  } catch (error) {
+    console.error("Unable to read saved dashboard widget preferences.", error);
+    return defaultDashboardWidgets;
+  }
+}
 
 function toDateInputValue(date: Date) {
   const year = date.getFullYear();
@@ -207,12 +297,11 @@ function generateCardDetails(): GeneratedCardDetails {
 
 const navigation: {
   label: string;
-  items: { name: PageName; icon: typeof Home }[];
+  items: { name: PageName; icon: typeof Landmark }[];
 }[] = [
   {
     label: "BANKING",
     items: [
-      { name: "Overview", icon: Home },
       { name: "Accounts", icon: Landmark },
       { name: "Transactions", icon: ArrowLeftRight },
       { name: "Transfers", icon: ArrowUpRight },
@@ -257,8 +346,14 @@ function App() {
   const [supportSubject, setSupportSubject] = useState("");
   const [supportCategory, setSupportCategory] = useState("Account access");
   const [supportMessage, setSupportMessage] = useState("");
-
-  const [activePage, setActivePage] = useState<PageName>("Overview");
+  const [activePage, setActivePage] = useState<PageName>("Accounts");
+  const [theme, setTheme] = useState<ThemePreference>(readThemePreference);
+  const [dashboardWidgets, setDashboardWidgets] =
+    useState<DashboardWidgets>(readDashboardWidgets);
+  const [failedProfileAvatarUrl, setFailedProfileAvatarUrl] = useState("");
+  const [widgetMenuOpen, setWidgetMenuOpen] = useState(false);
+  void widgetMenuOpen;
+  void setWidgetMenuOpen;
   const [showBalance, setShowBalance] = useState(true);
   const [showCardDetails, setShowCardDetails] = useState(false);
   const [generatedCardDetails, setGeneratedCardDetails] =
@@ -282,13 +377,16 @@ function App() {
     useState<DatabaseTransaction | null>(null);
   const transactionDialogRef = useRef<HTMLDialogElement>(null);
   const [dashboardRange, setDashboardRange] = useState<DashboardRange>("6m");
+  void setDashboardRange;
   const [customStartDate, setCustomStartDate] = useState(() => {
     const date = new Date();
     return toDateInputValue(new Date(date.getFullYear(), date.getMonth() - 5, 1));
   });
+  void setCustomStartDate;
   const [customEndDate, setCustomEndDate] = useState(() =>
     toDateInputValue(new Date()),
   );
+  void setCustomEndDate;
 
   // Close the mobile navigation with the Escape key.
   useEffect(() => {
@@ -306,6 +404,10 @@ function App() {
       document.removeEventListener("keydown", handleEscape);
     };
   }, [menuOpen]);
+
+  useEffect(() => {
+    document.documentElement.style.colorScheme = theme;
+  }, [theme]);
 
   useEffect(() => {
     const dialog = transactionDialogRef.current;
@@ -686,10 +788,12 @@ function App() {
   const monthlyIncome = dashboardCompletedTransactions
     .filter((transaction) => transaction.transaction_type === "credit")
     .reduce((total, transaction) => total + Math.abs(Number(transaction.amount)), 0);
+  void monthlyIncome;
 
   const monthlySpending = dashboardCompletedTransactions
     .filter((transaction) => transaction.transaction_type === "debit")
     .reduce((total, transaction) => total + Math.abs(Number(transaction.amount)), 0);
+  void monthlySpending;
 
   const currentDate = toDateInputValue(new Date());
   const currentMonth = currentDate.slice(0, 7);
@@ -734,6 +838,7 @@ function App() {
       }))
       .sort((first, second) => second.amount - first.amount);
   }, [dashboardCompletedTransactions]);
+  void categoryTotals;
 
   const cashflowMax = Math.max(
     1,
@@ -748,6 +853,8 @@ function App() {
     ...monthlyActivity.map((month) => month.balance),
   );
   const balanceSpan = Math.max(1, balanceMax - balanceMin);
+  void cashflowMax;
+  void balanceSpan;
 
   const filteredTransactions = useMemo(() => {
     const pageQuery = transactionSearch.trim().toLowerCase();
@@ -799,6 +906,7 @@ function App() {
       }),
     [dateRange, filteredTransactions],
   );
+  void dashboardActivity;
 
   const filteredSupportFaqs = useMemo(() => {
     const query = faqSearch.trim().toLowerCase();
@@ -819,6 +927,34 @@ function App() {
   function showMessage(message: string) {
     setNotice(message);
   }
+
+  function toggleTheme() {
+    const nextTheme = theme === "light" ? "dark" : "light";
+    try {
+      localStorage.setItem("guardian-theme", nextTheme);
+    } catch (error) {
+      console.error("Unable to save the theme preference.", error);
+      showMessage("Your theme changed, but couldn't be saved on this device.");
+    }
+    setTheme(nextTheme);
+  }
+
+  function updateDashboardWidget(key: keyof DashboardWidgets, visible: boolean) {
+    const updatedWidgets = { ...dashboardWidgets, [key]: visible };
+    try {
+      localStorage.setItem(
+        "guardian-dashboard-widgets",
+        JSON.stringify(updatedWidgets),
+      );
+    } catch (error) {
+      console.error("Unable to save dashboard widget preferences.", error);
+      showMessage(
+        "The dashboard updated, but your widget preferences couldn't be saved.",
+      );
+    }
+    setDashboardWidgets(updatedWidgets);
+  }
+  void updateDashboardWidget;
 
   async function handleSubmitSupportRequest(
     event: FormEvent<HTMLFormElement>,
@@ -993,7 +1129,7 @@ function App() {
 
     setCustomerAccount(null);
     setDatabaseTransactions([]);
-    setActivePage("Overview");
+    setActivePage("Accounts");
     setSearch("");
     setTransactionSearch("");
     setMenuOpen(false);
@@ -1165,9 +1301,32 @@ function App() {
     .join("")
     .slice(0, 2)
     .toUpperCase();
+  const avatarCandidate =
+    session.user.user_metadata?.avatar_url ??
+    session.user.user_metadata?.picture;
+  const profileAvatarUrl =
+    typeof avatarCandidate === "string" &&
+    /^https?:\/\//i.test(avatarCandidate)
+      ? avatarCandidate
+      : "";
+  const widgetOptions: {
+    key: keyof DashboardWidgets;
+    label: string;
+  }[] = [
+    { key: "balance", label: "Account balance" },
+    { key: "income", label: "Money in" },
+    { key: "spending", label: "Money out" },
+    { key: "cashflow", label: "Income & expenses chart" },
+    { key: "balanceTrend", label: "Balance trend" },
+    { key: "activity", label: "Recent activity" },
+    { key: "categories", label: "Spending categories" },
+    { key: "account", label: "Account details" },
+    { key: "quickActions", label: "Quick actions" },
+  ];
+  void widgetOptions;
 
   return (
-    <div className="app-shell">
+    <div className="app-shell" data-theme={theme}>
       {menuOpen && (
         <button
           type="button"
@@ -1316,11 +1475,35 @@ function App() {
 
             <button
               type="button"
+              className="icon-button theme-toggle"
+              aria-label={`Switch to ${theme === "light" ? "dark" : "light"} theme`}
+              title={`Switch to ${theme === "light" ? "dark" : "light"} theme`}
+              onClick={() =>
+                toggleTheme()
+              }
+            >
+              {theme === "light" ? <Moon size={19} /> : <Sun size={19} />}
+            </button>
+
+            <button
+              type="button"
               className="topbar-profile"
               onClick={() => navigate("My Profile")}
               aria-label={`Open profile for ${displayName}`}
             >
-              <span className="avatar">{initials}</span>
+              <span className="avatar topbar-profile-avatar">
+                {profileAvatarUrl &&
+                failedProfileAvatarUrl !== profileAvatarUrl ? (
+                  <img
+                    src={profileAvatarUrl}
+                    alt=""
+                    referrerPolicy="no-referrer"
+                    onError={() => setFailedProfileAvatarUrl(profileAvatarUrl)}
+                  />
+                ) : (
+                  initials
+                )}
+              </span>
               <span className="topbar-profile-copy">
                 <strong>{displayName}</strong>
                 <small>Personal account</small>
@@ -1335,19 +1518,17 @@ function App() {
             <p className="eyebrow">ONLINE BANKING</p>
             <h1>{activePage}</h1>
             <p className="page-subtitle">
-              {activePage === "Overview"
-                ? "Here's what's happening with your account."
-                : activePage === "Accounts"
-                  ? "View your account information."
-                  : activePage === "Transactions"
-                    ? "Review and filter your transaction history."
-                    : activePage === "My Profile"
-                      ? "Manage your personal information."
-                      : activePage === "Settings"
-                        ? "Manage your profile and preferences."
-                        : activePage === "Customer Support"
-                          ? "Find answers and get help with your account."
-                          : `Explore your ${activePage.toLowerCase()} workspace.`}
+              {activePage === "Accounts"
+                ? "View your account information."
+                : activePage === "Transactions"
+                  ? "Review and filter your transaction history."
+                  : activePage === "My Profile"
+                    ? "Manage your personal information."
+                    : activePage === "Settings"
+                      ? "Manage your profile and preferences."
+                      : activePage === "Customer Support"
+                        ? "Find answers and get help with your account."
+                        : `Explore your ${activePage.toLowerCase()} workspace.`}
             </p>
           </div>
 
@@ -1375,589 +1556,6 @@ function App() {
               <X size={17} />
             </button>
           </div>
-        )}
-
-        <div className="account-notice">
-          <ShieldCheck size={17} />
-          <span>
-            Transfers and payments are currently unavailable. No money can be
-            moved or payments made from this service.
-          </span>
-        </div>
-
-        {activePage === "Overview" && (
-          <section className="dashboard-content" aria-label="Dashboard overview">
-            <div className="welcome-row">
-              <div>
-                <h2>Welcome back, {displayName.split(" ")[0]}!</h2>
-                <p>Here is a summary of your banking activity.</p>
-              </div>
-              <div className="welcome-sparkle" aria-hidden="true">
-                <Sparkles size={22} />
-              </div>
-            </div>
-
-            <section className="dashboard-filter-bar" aria-label="Dashboard date range">
-              <div className="dashboard-filter-heading">
-                <CalendarDays size={18} />
-                <div>
-                  <strong>Activity period</strong>
-                  <span>
-                    {dateRange.valid
-                      ? `${new Date(`${dateRange.start}T00:00:00`).toLocaleDateString(
-                          "en-US",
-                          { month: "short", day: "numeric", year: "numeric" },
-                        )} – ${new Date(`${dateRange.end}T00:00:00`).toLocaleDateString(
-                          "en-US",
-                          { month: "short", day: "numeric", year: "numeric" },
-                        )}`
-                      : "Choose a valid date range"}
-                  </span>
-                </div>
-              </div>
-              <div className="dashboard-date-controls">
-                <div className="dashboard-range-options" aria-label="Quick date ranges">
-                  {(
-                    [
-                      ["30d", "30 days"],
-                      ["90d", "90 days"],
-                      ["6m", "6 months"],
-                      ["12m", "12 months"],
-                      ["custom", "Custom"],
-                    ] as const
-                  ).map(([range, label]) => (
-                    <button
-                      type="button"
-                      key={range}
-                      className={`dashboard-range-button ${
-                        dashboardRange === range ? "active" : ""
-                      }`}
-                      aria-pressed={dashboardRange === range}
-                      onClick={() => setDashboardRange(range)}
-                    >
-                      {label}
-                    </button>
-                  ))}
-                </div>
-                {dashboardRange === "custom" && (
-                  <div className="dashboard-custom-dates">
-                    <label>
-                      <span>From</span>
-                      <input
-                        type="date"
-                        value={customStartDate}
-                        max={customEndDate}
-                        onChange={(event) => setCustomStartDate(event.target.value)}
-                      />
-                    </label>
-                    <label>
-                      <span>To</span>
-                      <input
-                        type="date"
-                        value={customEndDate}
-                        min={customStartDate}
-                        max={toDateInputValue(new Date())}
-                        onChange={(event) => setCustomEndDate(event.target.value)}
-                      />
-                    </label>
-                  </div>
-                )}
-              </div>
-            </section>
-
-            <div className="balance-grid">
-              <section className="balance-card">
-                <div className="balance-card-top">
-                  <span className="balance-label">Total account balance</span>
-                  <button
-                    type="button"
-                    className="balance-visibility"
-                    onClick={() => setShowBalance((current) => !current)}
-                    aria-label={
-                      showBalance ? "Hide account balances" : "Show account balances"
-                    }
-                  >
-                    {showBalance ? <Eye size={19} /> : <EyeOff size={19} />}
-                    <span>{showBalance ? "Hide balance" : "Show balance"}</span>
-                  </button>
-                </div>
-
-                {accountLoading ? (
-                  <p className="balance-amount" role="status">
-                    Loading...
-                  </p>
-                ) : accountError ? (
-                  <div className="balance-error" role="alert">
-                    <p>{accountError}</p>
-                    <button
-                      type="button"
-                      className="balance-visibility"
-                      onClick={refreshPage}
-                    >
-                      Refresh page
-                    </button>
-                  </div>
-                ) : (
-                  <p className="balance-amount">
-                    {showBalance
-                      ? formatMoney(Number(customerAccount?.balance ?? 0))
-                      : maskedBalance}
-                  </p>
-                )}
-
-                <div className="balance-card-footer">
-                  <span className="account-type-status">
-                    <span
-                      className={`account-status-indicator ${
-                        customerAccount ? "active" : "unavailable"
-                      }`}
-                      aria-hidden="true"
-                    />
-                    {customerAccount
-                      ? `${customerAccount.account_type} · Active`
-                      : accountLoading
-                        ? "Checking account status"
-                        : "Account unavailable"}
-                  </span>
-                  <span className="balance-card-account-number">
-                    {customerAccount?.account_number
-                      ? `•••• ${customerAccount.account_number.slice(-4)}`
-                      : "Number unavailable"}
-                    {customerAccount?.account_number && (
-                      <button
-                        type="button"
-                        className="account-copy-button account-copy-button-light"
-                        aria-label="Copy full account number"
-                        title="Copy account number"
-                        onClick={handleCopyAccountNumber}
-                      >
-                        <Copy size={14} />
-                      </button>
-                    )}
-                  </span>
-                </div>
-              </section>
-
-              <section className="summary-card">
-                <div className="summary-card-top">
-                  <div className="summary-icon income-icon">
-                    <ArrowDownLeft size={20} />
-                  </div>
-                  <span>Selected period</span>
-                </div>
-                <p className="summary-label">Money in</p>
-                <h3>
-                  {showBalance ? formatMoney(monthlyIncome) : maskedBalance}
-                </h3>
-                <p className="summary-footnote">
-                  <span className="positive-text">Credits</span> · Completed
-                  transactions
-                </p>
-              </section>
-
-              <section className="summary-card">
-                <div className="summary-card-top">
-                  <div className="summary-icon spending-icon">
-                    <ArrowUpRight size={20} />
-                  </div>
-                  <span>Selected period</span>
-                </div>
-                <p className="summary-label">Money out</p>
-                <h3>
-                  {showBalance ? formatMoney(monthlySpending) : maskedBalance}
-                </h3>
-                <p className="summary-footnote">
-                  Debits · Completed transactions
-                </p>
-              </section>
-            </div>
-
-            <div className="analytics-grid">
-              <section className="panel analytics-panel">
-                <div className="panel-header">
-                  <div>
-                    <h2>Income &amp; expenses</h2>
-                    <p>Monthly completed transactions in this period</p>
-                  </div>
-                  <div className="chart-legend" aria-label="Chart legend">
-                    <span><i className="legend-income" />Income</span>
-                    <span><i className="legend-expense" />Expenses</span>
-                  </div>
-                </div>
-                {dashboardCompletedTransactions.length === 0 ? (
-                  <div className="chart-empty-state">
-                    No completed transactions in this period yet.
-                  </div>
-                ) : (
-                  <div className="chart-scroll">
-                    <svg
-                      className="cashflow-chart"
-                      viewBox="0 0 720 230"
-                      role="img"
-                      aria-label="Monthly income and expense comparison"
-                    >
-                      <line x1="42" y1="20" x2="704" y2="20" />
-                      <line x1="42" y1="60" x2="704" y2="60" />
-                      <line x1="42" y1="100" x2="704" y2="100" />
-                      <line x1="42" y1="140" x2="704" y2="140" />
-                      <line x1="42" y1="180" x2="704" y2="180" />
-                      {monthlyActivity.map((month, index) => {
-                        const slot = 662 / monthlyActivity.length;
-                        const center = 42 + slot * (index + 0.5);
-                        const barWidth = Math.min(20, slot * 0.32);
-                        const incomeHeight = (month.income / cashflowMax) * 145;
-                        const spendingHeight = (month.spending / cashflowMax) * 145;
-
-                        return (
-                          <g key={month.date.toISOString()}>
-                            <title>
-                              {month.label}: income {formatMoney(month.income)}, expenses{" "}
-                              {formatMoney(month.spending)}
-                            </title>
-                            <rect
-                              className="cashflow-income-bar"
-                              x={center - barWidth - 2}
-                              y={180 - incomeHeight}
-                              width={barWidth}
-                              height={incomeHeight}
-                              rx="4"
-                            />
-                            <rect
-                              className="cashflow-expense-bar"
-                              x={center + 2}
-                              y={180 - spendingHeight}
-                              width={barWidth}
-                              height={spendingHeight}
-                              rx="4"
-                            />
-                            {(monthlyActivity.length <= 8 || index % 2 === 0) && (
-                              <text x={center} y="207" textAnchor="middle">
-                                {month.label}
-                              </text>
-                            )}
-                          </g>
-                        );
-                      })}
-                    </svg>
-                  </div>
-                )}
-              </section>
-
-              <section className="panel analytics-panel">
-                <div className="panel-header">
-                  <div>
-                    <h2>Monthly balance trend</h2>
-                    <p>Estimated from your current balance and transaction history</p>
-                  </div>
-                  <TrendingUp size={19} className="analytics-heading-icon" />
-                </div>
-                {accountLoading ? (
-                  <div className="chart-empty-state" role="status">
-                    Loading your balance history...
-                  </div>
-                ) : accountError ? (
-                  <div className="chart-empty-state" role="alert">
-                    Balance history is unavailable until your account loads.
-                  </div>
-                ) : monthlyActivity.length === 0 ? (
-                  <div className="chart-empty-state">
-                    Select a valid date range to see your balance trend.
-                  </div>
-                ) : (
-                  <div className="chart-scroll">
-                    <svg
-                      className="balance-trend-chart"
-                      viewBox="0 0 720 230"
-                      role="img"
-                      aria-label="Estimated monthly account balance trend"
-                    >
-                      <line x1="42" y1="20" x2="704" y2="20" />
-                      <line x1="42" y1="60" x2="704" y2="60" />
-                      <line x1="42" y1="100" x2="704" y2="100" />
-                      <line x1="42" y1="140" x2="704" y2="140" />
-                      <line x1="42" y1="180" x2="704" y2="180" />
-                      {monthlyActivity.length > 1 && (
-                        <polyline
-                          className="balance-trend-line"
-                          points={monthlyActivity
-                            .map((month, index) => {
-                              const x =
-                                42 +
-                                (662 / (monthlyActivity.length - 1)) * index;
-                              const y =
-                                180 -
-                                ((month.balance - balanceMin) / balanceSpan) *
-                                  145;
-                              return `${x},${y}`;
-                            })
-                            .join(" ")}
-                        />
-                      )}
-                      {monthlyActivity.map((month, index) => {
-                        const x =
-                          monthlyActivity.length === 1
-                            ? 373
-                            : 42 +
-                              (662 / (monthlyActivity.length - 1)) * index;
-                        const y =
-                          180 -
-                          ((month.balance - balanceMin) / balanceSpan) * 145;
-
-                        return (
-                          <g key={month.date.toISOString()}>
-                            <title>
-                              {month.label}: estimated balance{" "}
-                              {formatMoney(month.balance)}
-                            </title>
-                            <circle
-                              className="balance-trend-point"
-                              cx={x}
-                              cy={y}
-                              r="5"
-                            />
-                            {(monthlyActivity.length <= 8 || index % 2 === 0) && (
-                              <text x={x} y="207" textAnchor="middle">
-                                {month.label}
-                              </text>
-                            )}
-                          </g>
-                        );
-                      })}
-                    </svg>
-                  </div>
-                )}
-                <p className="chart-disclaimer">
-                  Historical balances are estimates based on the transactions available.
-                </p>
-              </section>
-            </div>
-
-            <div className="content-grid">
-              <section className="panel transactions-panel">
-                <div className="panel-header">
-                  <div>
-                    <h2>Recent activity</h2>
-                    <p>Transactions in the selected period</p>
-                  </div>
-                  <button
-                    type="button"
-                    className="text-button"
-                    onClick={() => navigate("Transactions")}
-                  >
-                    View all <ArrowUpRight size={15} />
-                  </button>
-                </div>
-
-                <div className="transaction-list">
-                  {renderTransactionContent(5, dashboardActivity)}
-                </div>
-              </section>
-
-              <div className="dashboard-side-column">
-                <section className="panel spending-categories-panel">
-                  <div className="panel-header">
-                    <div>
-                      <h2>Spending categories</h2>
-                      <p>Completed debits · selected period</p>
-                    </div>
-                    <Activity size={19} className="analytics-heading-icon" />
-                  </div>
-                  {categoryTotals.length === 0 ? (
-                    <div className="empty-state">
-                      No completed spending to categorize in this period.
-                    </div>
-                  ) : (
-                    <div className="category-list">
-                      {categoryTotals.map((category) => (
-                        <div className="category-row" key={category.name}>
-                          <div className="category-row-heading">
-                            <span>
-                              <i style={{ backgroundColor: category.color }} />
-                              {category.name}
-                            </span>
-                            <strong>
-                              {showBalance ? formatMoney(category.amount) : maskedBalance}
-                            </strong>
-                          </div>
-                          <div
-                            className="category-progress"
-                            role="progressbar"
-                            aria-label={`${category.name} share of spending`}
-                            aria-valuemin={0}
-                            aria-valuemax={100}
-                            aria-valuenow={Math.round(
-                              (category.amount / monthlySpending) * 100,
-                            )}
-                          >
-                            <span
-                              style={{
-                                width: `${(category.amount / monthlySpending) * 100}%`,
-                                backgroundColor: category.color,
-                              }}
-                            />
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  <p className="category-disclaimer">
-                    Categories are estimated from transaction descriptions.
-                  </p>
-                </section>
-
-                <section className="panel account-panel">
-                  <div className="panel-header">
-                    <div>
-                      <h2>My account</h2>
-                      <p>Your account information</p>
-                    </div>
-                    <span
-                      className={`account-status-badge ${
-                        customerAccount ? "active" : "unavailable"
-                      }`}
-                    >
-                      <span
-                        className="account-status-indicator"
-                        aria-hidden="true"
-                      />
-                      {customerAccount
-                        ? "Active"
-                        : accountLoading
-                          ? "Checking"
-                          : "Unavailable"}
-                    </span>
-                  </div>
-
-                  {accountLoading ? (
-                    <div role="status" className="empty-state">
-                      Loading account details...
-                    </div>
-                  ) : accountError ? (
-                    <div className="empty-state" role="alert">
-                      <p>{accountError}</p>
-                      <button
-                        type="button"
-                        className="text-button"
-                        onClick={refreshPage}
-                      >
-                        Refresh page
-                      </button>
-                    </div>
-                  ) : customerAccount ? (
-                    <>
-                      <div className="account-type-row">
-                        <div className="account-type-icon">
-                          <Wallet size={21} />
-                        </div>
-                        <div>
-                          <strong>{customerAccount.account_name}</strong>
-                          <span>{customerAccount.account_type} account · {customerAccount.currency}</span>
-                        </div>
-                      </div>
-
-                      <div className="account-detail-row">
-                        <span>Account number</span>
-                        <span className="account-number-value">
-                          <strong>•••• {customerAccount.account_number.slice(-4)}</strong>
-                          <button
-                            type="button"
-                            className="account-copy-button"
-                            aria-label="Copy full account number"
-                            title="Copy account number"
-                            onClick={handleCopyAccountNumber}
-                          >
-                            <Copy size={15} />
-                          </button>
-                        </span>
-                      </div>
-                      <div className="account-detail-row">
-                        <span>Available balance</span>
-                        <strong>
-                          {showBalance
-                            ? formatMoney(Number(customerAccount.balance))
-                            : maskedBalance}
-                        </strong>
-                      </div>
-
-                      <button
-                        type="button"
-                        className="button-secondary full-width"
-                        onClick={() => navigate("Accounts")}
-                      >
-                        View account details
-                      </button>
-                    </>
-                  ) : (
-                    renderAccountError()
-                  )}
-                </section>
-
-                <section className="panel quick-actions-panel">
-                  <div className="panel-header">
-                    <div>
-                      <h2>Quick actions</h2>
-                      <p>Explore available sections</p>
-                    </div>
-                    <SlidersHorizontal size={19} />
-                  </div>
-
-                  <div className="quick-actions">
-                    <button
-                      type="button"
-                      className="quick-action"
-                      onClick={() => navigate("Accounts")}
-                    >
-                      <span className="quick-action-icon">
-                        <Landmark size={19} />
-                      </span>
-                      <span>Accounts</span>
-                      <ArrowUpRight size={16} />
-                    </button>
-
-                    <button
-                      type="button"
-                      className="quick-action"
-                      onClick={() => navigate("Transactions")}
-                    >
-                      <span className="quick-action-icon">
-                        <Activity size={19} />
-                      </span>
-                      <span>Transactions</span>
-                      <ArrowUpRight size={16} />
-                    </button>
-
-                    <button
-                      type="button"
-                      className="quick-action"
-                      onClick={() => navigate("My Profile")}
-                    >
-                      <span className="quick-action-icon">
-                        <UserRound size={19} />
-                      </span>
-                      <span>My profile</span>
-                      <ArrowUpRight size={16} />
-                    </button>
-
-                    <button
-                      type="button"
-                      className="quick-action"
-                      onClick={() =>
-                        showMessage(
-                          "Transfers and payments are currently unavailable.",
-                        )
-                      }
-                    >
-                      <span className="quick-action-icon">
-                        <ArrowLeftRight size={19} />
-                      </span>
-                      <span>Transfer information</span>
-                      <ArrowUpRight size={16} />
-                    </button>
-                  </div>
-                </section>
-              </div>
-            </div>
-          </section>
         )}
 
         {activePage === "Accounts" && (
@@ -2382,22 +1980,21 @@ function App() {
         )}
 
         {activePage === "Transfers" && (
-          <section className="page-content">
-            <section className="panel placeholder-panel">
-              <div className="placeholder-icon">
-                <ArrowLeftRight size={27} />
-              </div>
-              <h2>Transfers</h2>
+          <section className="page-content transfer-content">
+            <section className="panel transfer-unavailable-panel">
+              <span className="transfer-unavailable-icon" aria-hidden="true">
+                <ArrowLeftRight size={25} />
+              </span>
+              <h2>Transfers are unavailable</h2>
               <p>
-                Transfers are currently unavailable. No money can be moved
-                from this screen.
+                Contact customer support for assistance with transfers.
               </p>
               <button
                 type="button"
-                className="button-secondary"
-                onClick={() => navigate("Transactions")}
+                className="button-primary"
+                onClick={() => navigate("Customer Support")}
               >
-                View transactions
+                Contact support <Headset size={17} />
               </button>
             </section>
           </section>
