@@ -153,7 +153,6 @@ type Beneficiary = {
 
 type TransferStep = "form" | "review" | "confirmed";
 
-type DashboardRange = "30d" | "90d" | "6m" | "12m" | "custom";
 type ThemePreference = "light" | "dark";
 
 const dashboardWidgets = {
@@ -358,7 +357,6 @@ function App() {
   const [theme, setTheme] = useState<ThemePreference>(readThemePreference);
   const [failedProfileAvatarUrl, setFailedProfileAvatarUrl] = useState("");
   const [showBalance, setShowBalance] = useState(true);
-  const [activityPeriodOpen, setActivityPeriodOpen] = useState(false);
   const [showCardDetails, setShowCardDetails] = useState(false);
   const [generatedCardDetails, setGeneratedCardDetails] =
     useState<GeneratedCardDetails | null>(null);
@@ -413,18 +411,6 @@ function App() {
   const [transferStep, setTransferStep] = useState<TransferStep>("form");
   const [transferError, setTransferError] = useState("");
   const [confirmationReference, setConfirmationReference] = useState("");
-  const [dashboardRange, setDashboardRange] = useState<DashboardRange>("6m");
-  void setDashboardRange;
-  const [customStartDate, setCustomStartDate] = useState(() => {
-    const date = new Date();
-    return toDateInputValue(new Date(date.getFullYear(), date.getMonth() - 5, 1));
-  });
-  void setCustomStartDate;
-  const [customEndDate, setCustomEndDate] = useState(() =>
-    toDateInputValue(new Date()),
-  );
-  void setCustomEndDate;
-
   // Close the mobile navigation with the Escape key.
   useEffect(() => {
     if (!menuOpen) return;
@@ -826,35 +812,14 @@ function App() {
 
   const dateRange = useMemo(() => {
     const now = new Date();
-    const today = toDateInputValue(now);
-
-    if (dashboardRange === "custom") {
-      return {
-        start: customStartDate,
-        end: customEndDate,
-        valid:
-          Boolean(customStartDate && customEndDate) &&
-          customStartDate <= customEndDate,
-      };
-    }
-
-    if (dashboardRange === "6m" || dashboardRange === "12m") {
-      const months = dashboardRange === "6m" ? 5 : 11;
-      return {
-        start: toDateInputValue(
-          new Date(now.getFullYear(), now.getMonth() - months, 1),
-        ),
-        end: today,
-        valid: true,
-      };
-    }
-
-    const days = dashboardRange === "30d" ? 29 : 89;
-    const start = new Date(now);
-    start.setDate(start.getDate() - days);
-
-    return { start: toDateInputValue(start), end: today, valid: true };
-  }, [dashboardRange, customStartDate, customEndDate]);
+    return {
+      start: toDateInputValue(
+        new Date(now.getFullYear(), now.getMonth() - 5, 1),
+      ),
+      end: toDateInputValue(now),
+      valid: true,
+    };
+  }, []);
 
   const dashboardTransactions = useMemo(() => {
     if (!dateRange.valid) return [];
@@ -1812,26 +1777,134 @@ function App() {
           </div>
 
           <div className="topbar-actions">
-            <label className="search-box">
-              <Search size={18} aria-hidden="true" />
-              <span className="sr-only">Search transactions</span>
-              <input
-                type="search"
-                placeholder="Search transactions..."
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-              />
-              {search && (
-                <button
-                  type="button"
-                  className="search-clear"
-                  aria-label="Clear search"
-                  onClick={() => setSearch("")}
+            {activePage !== "Dashboard" && (
+              <label className="search-box">
+                <Search size={18} aria-hidden="true" />
+                <span className="sr-only">Search transactions</span>
+                <input
+                  type="search"
+                  placeholder="Search transactions..."
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                />
+                {search && (
+                  <button
+                    type="button"
+                    className="search-clear"
+                    aria-label="Clear search"
+                    onClick={() => setSearch("")}
+                  >
+                    <X size={15} />
+                  </button>
+                )}
+              </label>
+            )}
+
+            <div className="topbar-account-actions">
+            <div className="profile-menu-container" ref={profileMenuRef}>
+              <button
+                type="button"
+                className="topbar-profile topbar-profile-borderless"
+                onClick={() => {
+                  setProfileMenuOpen((open) => !open);
+                  setCloseAccountConfirmOpen(false);
+                }}
+                aria-label={`Profile options for ${displayName}`}
+                aria-haspopup="menu"
+                aria-expanded={profileMenuOpen}
+                aria-controls="profile-options-menu"
+              >
+                <span className="avatar topbar-profile-avatar">
+                  {profileAvatarUrl &&
+                  failedProfileAvatarUrl !== profileAvatarUrl ? (
+                    <img
+                      src={profileAvatarUrl}
+                      alt=""
+                      referrerPolicy="no-referrer"
+                      onError={() => setFailedProfileAvatarUrl(profileAvatarUrl)}
+                    />
+                  ) : (
+                    initials
+                  )}
+                </span>
+                <span className="topbar-profile-copy">
+                  <strong>{displayName}</strong>
+                  <small>Personal account</small>
+                </span>
+                <ChevronDown size={16} />
+              </button>
+
+              {profileMenuOpen && (
+                <div
+                  className="profile-options-menu"
+                  id="profile-options-menu"
+                  role="menu"
+                  aria-label="Profile options"
                 >
-                  <X size={15} />
-                </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      navigate("My Profile");
+                      setProfileMenuOpen(false);
+                    }}
+                  >
+                    Profile details
+                  </button>
+                  <button
+                    type="button"
+                    className="profile-close-account"
+                    role="menuitem"
+                    onClick={() =>
+                      setCloseAccountConfirmOpen((open) => !open)
+                    }
+                    aria-expanded={closeAccountConfirmOpen}
+                  >
+                    Close account
+                  </button>
+
+                  {closeAccountConfirmOpen && (
+                    <div
+                      className="close-account-confirmation"
+                      role="group"
+                      aria-label="Confirm close account"
+                    >
+                      <strong>Delete</strong>
+                      <div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setProfileMenuOpen(false);
+                            setCloseAccountConfirmOpen(false);
+                            showMessage(
+                              "Your account data was not changed. Contact customer support to request account closure.",
+                            );
+                          }}
+                        >
+                          Yes
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setCloseAccountConfirmOpen(false)}
+                        >
+                          No
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
               )}
-            </label>
+            </div>
+
+            <button
+              type="button"
+              className="icon-button theme-toggle"
+              aria-label={`Switch to ${theme === "light" ? "dark" : "light"} theme`}
+              title={`Switch to ${theme === "light" ? "dark" : "light"} theme`}
+              onClick={() => toggleTheme()}
+            >
+              {theme === "light" ? <Moon size={19} /> : <Sun size={19} />}
+            </button>
 
             <div className="notifications-container" ref={notificationsRef}>
               <button
@@ -1928,112 +2001,6 @@ function App() {
                 </section>
               )}
             </div>
-
-            <button
-              type="button"
-              className="icon-button theme-toggle"
-              aria-label={`Switch to ${theme === "light" ? "dark" : "light"} theme`}
-              title={`Switch to ${theme === "light" ? "dark" : "light"} theme`}
-              onClick={() =>
-                toggleTheme()
-              }
-            >
-              {theme === "light" ? <Moon size={19} /> : <Sun size={19} />}
-            </button>
-
-            <div className="profile-menu-container" ref={profileMenuRef}>
-              <button
-                type="button"
-                className="topbar-profile topbar-profile-borderless"
-                onClick={() => {
-                  setProfileMenuOpen((open) => !open);
-                  setCloseAccountConfirmOpen(false);
-                }}
-                aria-label={`Profile options for ${displayName}`}
-                aria-haspopup="menu"
-                aria-expanded={profileMenuOpen}
-                aria-controls="profile-options-menu"
-              >
-                <span className="avatar topbar-profile-avatar">
-                  {profileAvatarUrl &&
-                  failedProfileAvatarUrl !== profileAvatarUrl ? (
-                    <img
-                      src={profileAvatarUrl}
-                      alt=""
-                      referrerPolicy="no-referrer"
-                      onError={() => setFailedProfileAvatarUrl(profileAvatarUrl)}
-                    />
-                  ) : (
-                    initials
-                  )}
-                </span>
-                <span className="topbar-profile-copy">
-                  <strong>{displayName}</strong>
-                  <small>Personal account</small>
-                </span>
-                <ChevronDown size={16} />
-              </button>
-
-              {profileMenuOpen && (
-                <div
-                  className="profile-options-menu"
-                  id="profile-options-menu"
-                  role="menu"
-                  aria-label="Profile options"
-                >
-                  <button
-                    type="button"
-                    role="menuitem"
-                    onClick={() => {
-                      navigate("My Profile");
-                      setProfileMenuOpen(false);
-                    }}
-                  >
-                    Profile details
-                  </button>
-                  <button
-                    type="button"
-                    className="profile-close-account"
-                    role="menuitem"
-                    onClick={() =>
-                      setCloseAccountConfirmOpen((open) => !open)
-                    }
-                    aria-expanded={closeAccountConfirmOpen}
-                  >
-                    Close account
-                  </button>
-
-                  {closeAccountConfirmOpen && (
-                    <div
-                      className="close-account-confirmation"
-                      role="group"
-                      aria-label="Confirm close account"
-                    >
-                      <strong>Delete</strong>
-                      <div>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setProfileMenuOpen(false);
-                            setCloseAccountConfirmOpen(false);
-                            showMessage(
-                              "Your account data was not changed. Contact customer support to request account closure.",
-                            );
-                          }}
-                        >
-                          Yes
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setCloseAccountConfirmOpen(false)}
-                        >
-                          No
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
             </div>
           </div>
         </header>
@@ -2108,94 +2075,8 @@ function App() {
               </div>
             </div>
 
-            <section className="activity-period" aria-label="Dashboard date range">
-              <button
-                type="button"
-                className="activity-period-toggle"
-                aria-expanded={activityPeriodOpen}
-                aria-controls="activity-period-options"
-                onClick={() => setActivityPeriodOpen((open) => !open)}
-              >
-                <CalendarDays size={16} aria-hidden="true" />
-                <span className="activity-period-toggle-copy">
-                  <strong>Activity period</strong>
-                  <small>
-                    {dateRange.valid
-                      ? `${new Date(`${dateRange.start}T00:00:00`).toLocaleDateString(
-                          "en-US",
-                          { month: "short", day: "numeric", year: "numeric" },
-                        )} – ${new Date(`${dateRange.end}T00:00:00`).toLocaleDateString(
-                          "en-US",
-                          { month: "short", day: "numeric", year: "numeric" },
-                        )}`
-                      : "Choose a valid date range"}
-                  </small>
-                </span>
-                <ChevronDown
-                  size={15}
-                  className={`activity-period-chevron ${activityPeriodOpen ? "open" : ""}`}
-                  aria-hidden="true"
-                />
-              </button>
-              {activityPeriodOpen && (
-                <div className="dashboard-filter-bar" id="activity-period-options">
-                  <div className="dashboard-date-controls">
-                    <div className="dashboard-range-options" aria-label="Quick date ranges">
-                      {(
-                        [
-                          ["30d", "30 days"],
-                          ["90d", "90 days"],
-                          ["6m", "6 months"],
-                          ["12m", "12 months"],
-                          ["custom", "Custom"],
-                        ] as const
-                      ).map(([range, label]) => (
-                        <button
-                          type="button"
-                          key={range}
-                          className={`dashboard-range-button ${
-                            dashboardRange === range ? "active" : ""
-                          }`}
-                          aria-pressed={dashboardRange === range}
-                          onClick={() => setDashboardRange(range)}
-                        >
-                          {label}
-                        </button>
-                      ))}
-                    </div>
-                    {dashboardRange === "custom" && (
-                      <div className="dashboard-custom-dates">
-                        <label>
-                          <span>From</span>
-                          <input
-                            type="date"
-                            value={customStartDate}
-                            max={customEndDate}
-                            onChange={(event) => setCustomStartDate(event.target.value)}
-                          />
-                        </label>
-                        <label>
-                          <span>To</span>
-                          <input
-                            type="date"
-                            value={customEndDate}
-                            min={customStartDate}
-                            max={toDateInputValue(new Date())}
-                            onChange={(event) => setCustomEndDate(event.target.value)}
-                          />
-                        </label>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-            </section>
-
-            {(dashboardWidgets.balance ||
-              dashboardWidgets.income ||
-              dashboardWidgets.spending) && (
-              <div className="balance-grid">
-                {dashboardWidgets.balance && (
+            {dashboardWidgets.balance && (
+              <div className="balance-grid dashboard-account-balance">
                   <section className="balance-card">
                     <div className="balance-card-top">
                       <span className="balance-label">Total account balance</span>
@@ -2267,39 +2148,6 @@ function App() {
                       </span>
                     </div>
                   </section>
-                )}
-
-                {dashboardWidgets.income && (
-                  <section className="summary-card">
-                    <div className="summary-card-top">
-                      <div className="summary-icon income-icon">
-                        <ArrowDownLeft size={20} />
-                      </div>
-                      <span>Selected period</span>
-                    </div>
-                    <p className="summary-label">Money in</p>
-                    <h3>{showBalance ? formatMoney(monthlyIncome) : maskedBalance}</h3>
-                    <p className="summary-footnote">
-                      <span className="positive-text">Credits</span> · Completed transactions
-                    </p>
-                  </section>
-                )}
-
-                {dashboardWidgets.spending && (
-                  <section className="summary-card">
-                    <div className="summary-card-top">
-                      <div className="summary-icon spending-icon">
-                        <ArrowUpRight size={20} />
-                      </div>
-                      <span>Selected period</span>
-                    </div>
-                    <p className="summary-label">Money out</p>
-                    <h3>{showBalance ? formatMoney(monthlySpending) : maskedBalance}</h3>
-                    <p className="summary-footnote">
-                      Debits · Completed transactions
-                    </p>
-                  </section>
-                )}
               </div>
             )}
 
@@ -2349,6 +2197,42 @@ function App() {
                   </button>
                 </div>
               </section>
+            )}
+
+            {(dashboardWidgets.income || dashboardWidgets.spending) && (
+              <div className="balance-grid dashboard-summary-grid">
+                {dashboardWidgets.income && (
+                  <section className="summary-card">
+                    <div className="summary-card-top">
+                      <div className="summary-icon income-icon">
+                        <ArrowDownLeft size={20} />
+                      </div>
+                      <span>Selected period</span>
+                    </div>
+                    <p className="summary-label">Money in</p>
+                    <h3>{showBalance ? formatMoney(monthlyIncome) : maskedBalance}</h3>
+                    <p className="summary-footnote">
+                      <span className="positive-text">Credits</span> · Completed transactions
+                    </p>
+                  </section>
+                )}
+
+                {dashboardWidgets.spending && (
+                  <section className="summary-card">
+                    <div className="summary-card-top">
+                      <div className="summary-icon spending-icon">
+                        <ArrowUpRight size={20} />
+                      </div>
+                      <span>Selected period</span>
+                    </div>
+                    <p className="summary-label">Money out</p>
+                    <h3>{showBalance ? formatMoney(monthlySpending) : maskedBalance}</h3>
+                    <p className="summary-footnote">
+                      Debits · Completed transactions
+                    </p>
+                  </section>
+                )}
+              </div>
             )}
 
             {(dashboardWidgets.cashflow || dashboardWidgets.balanceTrend) && (
