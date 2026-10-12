@@ -372,6 +372,8 @@ export default function PaymentsPage({
 
     setSaving(true);
     setFormError("");
+    const idempotencyKey = idempotencyKeyRef.current ?? crypto.randomUUID();
+    idempotencyKeyRef.current = idempotencyKey;
     const { data, error: paymentError } = await supabase.rpc("submit_payment", {
       p_category: payment.category,
       p_provider: payment.provider.trim(),
@@ -379,7 +381,7 @@ export default function PaymentsPage({
       p_amount: Number(payment.amount),
       p_plan: payment.plan || null,
       p_beneficiary_id: payment.beneficiaryId || null,
-      p_idempotency_key: idempotencyKeyRef.current,
+      p_idempotency_key: idempotencyKey,
     });
     setSaving(false);
 
@@ -391,7 +393,11 @@ export default function PaymentsPage({
           ? "Your account balance is too low for this payment."
           : message.includes("ACCOUNT_NOT_FOUND")
             ? "No eligible account was found for this profile."
-            : "We couldn't confirm this payment. Retry this confirmation to safely check its status, or review payment history before starting another payment.",
+            : message.includes("INVALID_PAYMENT_BENEFICIARY")
+              ? "The selected beneficiary is no longer valid. Review the payment details and try again."
+              : message.includes("IDEMPOTENCY_KEY_REQUIRED")
+                ? "We couldn't create a secure payment reference. Please try confirming again."
+                : "We couldn't confirm this payment. Retry this confirmation to safely check its status, or review payment history before starting another payment.",
       );
       return;
     }

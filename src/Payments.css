@@ -770,6 +770,18 @@
     padding: 15px;
   }
 
+  .payments-receipt-heading {
+    align-items: center;
+    gap: 9px;
+    margin-bottom: 13px;
+  }
+
+  .payments-receipt-check {
+    width: 36px;
+    height: 36px;
+    flex-basis: 36px;
+  }
+
   .payments-summary-card {
     min-height: 94px;
   }
@@ -797,6 +809,33 @@
 
   .payments-receipt-heading h2 {
     font-size: 17px;
+  }
+
+  .payments-receipt-heading p:last-child {
+    font-size: 10px;
+    line-height: 1.45;
+  }
+
+  .payments-receipt-details > div {
+    display: grid;
+    grid-template-columns: minmax(72px, 0.7fr) minmax(0, 1.3fr);
+    align-items: start;
+    gap: 8px;
+    padding: 9px 1px;
+  }
+
+  .payments-receipt-details dt,
+  .payments-receipt-details dd {
+    min-width: 0;
+    font-size: 10px;
+    line-height: 1.4;
+    overflow-wrap: anywhere;
+  }
+
+  .payments-receipt > .payments-secondary-button {
+    width: 100%;
+    min-height: 42px;
+    margin-top: 12px;
   }
 
   .payments-ledger-note {

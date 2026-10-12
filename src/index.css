@@ -3334,21 +3334,203 @@ h4 {
 }
 
 @media (max-width: 480px) {
-  .transaction-row {
+  .transactions-panel {
+    padding: 14px;
+  }
+
+  .transactions-panel .panel-header {
+    margin-bottom: 14px;
+  }
+
+  .transactions-panel .panel-header h2 {
+    font-size: 15px;
+  }
+
+  .transaction-filters {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 8px;
+    padding: 9px;
+  }
+
+  .transaction-search-label {
+    grid-column: 1 / -1;
+    min-height: 36px;
+  }
+
+  .transaction-search-input {
+    height: 34px;
+    font-size: 12px;
+  }
+
+  .transaction-filters > label:not(.transaction-search-label) {
+    min-width: 0;
+  }
+
+  .transaction-filters > label:not(.transaction-date-filter) {
+    display: block;
+  }
+
+  .transaction-filter-select {
+    width: 100%;
+    min-height: 36px;
+    padding-right: 22px;
+    font-size: 11px;
+  }
+
+  .transaction-date-filter {
+    align-items: center;
+    flex-direction: row;
+    gap: 5px;
+    font-size: 10px;
+  }
+
+  .transaction-date-filter > span {
+    flex: 0 0 auto;
+  }
+
+  .transaction-date-input {
+    flex: 1 1 0;
+    width: 1%;
+    min-width: 0;
+    padding-right: 4px;
+    font-size: 10px;
+  }
+
+  .clear-filters-button,
+  .statement-download-button {
+    width: 100%;
+    justify-content: center;
+    min-height: 34px;
+    padding: 5px 6px;
+    font-size: 10px;
+    white-space: nowrap;
+  }
+
+  .clear-filters-button {
+    align-self: stretch;
+  }
+
+  .filter-results {
+    margin: -3px 0 12px;
+    font-size: 11px;
+  }
+
+  .transaction-row {
+    display: grid;
+    grid-template-columns: 36px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 9px;
+    margin: 0 0 8px;
+    padding: 11px;
+    background: var(--page-bg);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+  }
+
+  .transaction-row:last-child {
+    margin-bottom: 0;
+  }
+
+  .transaction-icon {
+    width: 36px;
+    height: 36px;
+    flex-basis: 36px;
+    border-radius: 10px;
+  }
+
+  .transaction-info {
+    flex: initial;
+    gap: 4px;
+  }
+
+  .transaction-info strong {
+    font-size: 12px;
+    line-height: 1.35;
+  }
+
+  .transaction-info span {
+    font-size: 10px;
+  }
+
+  .transaction-amount {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    max-width: 112px;
+    margin-left: 0;
+    font-size: 11px;
+  }
+
+  .transaction-amount strong {
+    font-size: 11px;
+    overflow-wrap: anywhere;
+  }
+
+  .transaction-amount > span {
+    color: var(--muted);
+    font-size: 9px;
   }
 
   .transaction-open-indicator {
-    width: 15px;
+    display: none;
   }
 
   .transaction-detail-dialog {
-    padding: 19px;
+    position: fixed;
+    inset: auto 0 0;
+    width: 100%;
+    max-width: none;
+    max-height: min(86dvh, 680px);
+    margin: 0;
+    padding: 18px 16px calc(16px + env(safe-area-inset-bottom));
+    overflow-y: auto;
+    border-right: 0;
+    border-bottom: 0;
+    border-left: 0;
+    border-radius: 20px 20px 0 0;
+    box-sizing: border-box;
+  }
+
+  .transaction-detail-header {
+    gap: 10px;
+    margin-bottom: 17px;
+  }
+
+  .transaction-detail-header h2 {
+    font-size: 17px;
+    line-height: 1.35;
+  }
+
+  .transaction-detail-amount {
+    gap: 8px;
+    margin-bottom: 14px;
+    padding: 13px;
   }
 
   .transaction-detail-amount > span:first-child {
     font-size: 20px;
   }
+
+  .transaction-detail-list {
+    margin-bottom: 16px;
+  }
+
+  .transaction-detail-list > div {
+    grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+    gap: 9px;
+    padding: 11px 1px;
+  }
+
+  .transaction-detail-list dt,
+  .transaction-detail-list dd {
+    font-size: 11px;
+  }
+
+  .transaction-detail-close {
+    min-height: 42px;
+  }
+
 }
 
 /* ---------- 26. Debit card ---------- */
