@@ -8,6 +8,7 @@ import {
   ArrowLeftRight,
   Home,
   ArrowUpRight,
+  ArrowDownToLine,
   Bell,
   CalendarDays,
   CheckCircle2,
@@ -23,6 +24,7 @@ import {
   Landmark,
   LockKeyhole,
   LogOut,
+  PiggyBank,
   Moon,
   Search,
   Send,
@@ -48,6 +50,51 @@ type DatabaseTransaction = {
   status: "pending" | "completed" | "failed";
   created_at: string;
 };
+
+function transferStorageKey(userId: string) {
+  return `guardian-transfers:${userId}`;
+}
+
+function readSavedTransfers(userId: string): DatabaseTransaction[] {
+  const stored = localStorage.getItem(transferStorageKey(userId));
+  if (!stored) return [];
+
+  const parsed: unknown = JSON.parse(stored);
+  if (!Array.isArray(parsed)) {
+    throw new Error("Saved transfer data must be a list.");
+  }
+
+  return parsed.map((item: unknown) => {
+    if (!item || typeof item !== "object") {
+      throw new Error("A saved transfer record is invalid.");
+    }
+
+    const record = item as Record<string, unknown>;
+    if (
+      typeof record.id !== "string" ||
+      !record.id.startsWith("TRF-") ||
+      typeof record.description !== "string" ||
+      typeof record.amount !== "number" ||
+      !Number.isFinite(record.amount) ||
+      record.amount <= 0 ||
+      record.transaction_type !== "debit" ||
+      record.status !== "completed" ||
+      typeof record.created_at !== "string" ||
+      !Number.isFinite(Date.parse(record.created_at))
+    ) {
+      throw new Error("A saved transfer record has invalid fields.");
+    }
+
+    return {
+      id: record.id,
+      description: record.description,
+      amount: record.amount,
+      transaction_type: "debit",
+      status: "completed",
+      created_at: record.created_at,
+    };
+  });
+}
 
 type CustomerAccount = {
   id: string;
@@ -84,19 +131,39 @@ type SupportTicket = {
   created_at: string;
 };
 
+type UserNotification = {
+  id: string;
+  type: "transaction" | "profile";
+  title: string;
+  message: string;
+  created_at: string;
+  read_at: string | null;
+};
+
+type Beneficiary = {
+  id: string;
+  name: string;
+  accountNumber: string;
+  routingNumber: string;
+  bankName: string;
+  nickname: string;
+};
+
+type TransferStep = "form" | "review" | "confirmed";
+
 type DashboardRange = "30d" | "90d" | "6m" | "12m" | "custom";
 type ThemePreference = "light" | "dark";
 
-type DashboardWidgets = {
-  balance: boolean;
-  income: boolean;
-  spending: boolean;
-  cashflow: boolean;
-  balanceTrend: boolean;
-  categories: boolean;
-  account: boolean;
-  quickActions: boolean;
-};
+const dashboardWidgets = {
+  balance: true,
+  income: true,
+  spending: true,
+  cashflow: true,
+  balanceTrend: true,
+  categories: true,
+  account: true,
+  quickActions: true,
+} as const;
 
 type MonthlyActivity = {
   date: Date;
@@ -184,73 +251,12 @@ const supportFaqs = [
   },
 ];
 
-const defaultDashboardWidgets: DashboardWidgets = {
-  balance: true,
-  income: true,
-  spending: true,
-  cashflow: true,
-  balanceTrend: true,
-  categories: true,
-  account: true,
-  quickActions: true,
-};
-
 function readThemePreference(): ThemePreference {
   try {
     return localStorage.getItem("guardian-theme") === "dark" ? "dark" : "light";
   } catch (error) {
     console.error("Unable to read the saved theme preference.", error);
     return "light";
-  }
-}
-
-function readDashboardWidgets(): DashboardWidgets {
-  try {
-    const stored = localStorage.getItem("guardian-dashboard-widgets");
-    if (!stored) return defaultDashboardWidgets;
-
-    const parsed: unknown = JSON.parse(stored);
-    if (!parsed || typeof parsed !== "object") return defaultDashboardWidgets;
-
-    const saved = parsed as Partial<DashboardWidgets>;
-
-    return {
-      balance:
-        typeof saved.balance === "boolean"
-          ? saved.balance
-          : defaultDashboardWidgets.balance,
-      income:
-        typeof saved.income === "boolean"
-          ? saved.income
-          : defaultDashboardWidgets.income,
-      spending:
-        typeof saved.spending === "boolean"
-          ? saved.spending
-          : defaultDashboardWidgets.spending,
-      cashflow:
-        typeof saved.cashflow === "boolean"
-          ? saved.cashflow
-          : defaultDashboardWidgets.cashflow,
-      balanceTrend:
-        typeof saved.balanceTrend === "boolean"
-          ? saved.balanceTrend
-          : defaultDashboardWidgets.balanceTrend,
-      categories:
-        typeof saved.categories === "boolean"
-          ? saved.categories
-          : defaultDashboardWidgets.categories,
-      account:
-        typeof saved.account === "boolean"
-          ? saved.account
-          : defaultDashboardWidgets.account,
-      quickActions:
-        typeof saved.quickActions === "boolean"
-          ? saved.quickActions
-          : defaultDashboardWidgets.quickActions,
-    };
-  } catch (error) {
-    console.error("Unable to read saved dashboard widget preferences.", error);
-    return defaultDashboardWidgets;
   }
 }
 
@@ -334,6 +340,11 @@ function App() {
   const [supportTickets, setSupportTickets] = useState<SupportTicket[]>([]);
   const [supportTicketsLoading, setSupportTicketsLoading] = useState(false);
   const [supportTicketsError, setSupportTicketsError] = useState("");
+  const [notifications, setNotifications] = useState<UserNotification[]>([]);
+  const [notificationsLoading, setNotificationsLoading] = useState(false);
+  const [notificationsError, setNotificationsError] = useState("");
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const notificationsRef = useRef<HTMLDivElement>(null);
   const [supportSubmitting, setSupportSubmitting] = useState(false);
   const [supportFormMessage, setSupportFormMessage] = useState("");
   const [faqSearch, setFaqSearch] = useState("");
@@ -342,13 +353,9 @@ function App() {
   const [supportMessage, setSupportMessage] = useState("");
   const [activePage, setActivePage] = useState<PageName>("Dashboard");
   const [theme, setTheme] = useState<ThemePreference>(readThemePreference);
-  const [dashboardWidgets, setDashboardWidgets] =
-    useState<DashboardWidgets>(readDashboardWidgets);
   const [failedProfileAvatarUrl, setFailedProfileAvatarUrl] = useState("");
-  const [widgetMenuOpen, setWidgetMenuOpen] = useState(false);
-  void widgetMenuOpen;
-  void setWidgetMenuOpen;
   const [showBalance, setShowBalance] = useState(true);
+  const [activityPeriodOpen, setActivityPeriodOpen] = useState(false);
   const [showCardDetails, setShowCardDetails] = useState(false);
   const [generatedCardDetails, setGeneratedCardDetails] =
     useState<GeneratedCardDetails | null>(null);
@@ -356,6 +363,9 @@ function App() {
   const [dailySpendLimit, setDailySpendLimit] = useState("500");
   const [monthlySpendLimit, setMonthlySpendLimit] = useState("2000");
   const [menuOpen, setMenuOpen] = useState(false);
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const [closeAccountConfirmOpen, setCloseAccountConfirmOpen] = useState(false);
+  const profileMenuRef = useRef<HTMLDivElement>(null);
   const [notice, setNotice] = useState("");
   const [search, setSearch] = useState("");
   const [transactionSearch, setTransactionSearch] = useState("");
@@ -370,6 +380,36 @@ function App() {
   const [selectedTransaction, setSelectedTransaction] =
     useState<DatabaseTransaction | null>(null);
   const transactionDialogRef = useRef<HTMLDialogElement>(null);
+  const [savedBeneficiaries, setSavedBeneficiaries] = useState<Beneficiary[]>([
+    {
+      id: "ben-olivia",
+      name: "Olivia Hart",
+      accountNumber: "7840294751",
+      routingNumber: "021000021",
+      bankName: "North Harbor Bank",
+      nickname: "Olivia",
+    },
+    {
+      id: "ben-marcus",
+      name: "Marcus Lee",
+      accountNumber: "5631209987",
+      routingNumber: "011000015",
+      bankName: "Summit Credit Union",
+      nickname: "Marcus",
+    },
+  ]);
+  const initialTransferForm = {
+    recipientName: "",
+    accountNumber: "",
+    routingNumber: "",
+    bankName: "",
+    amount: "",
+    remark: "",
+  };
+  const [transferForm, setTransferForm] = useState(initialTransferForm);
+  const [transferStep, setTransferStep] = useState<TransferStep>("form");
+  const [transferError, setTransferError] = useState("");
+  const [confirmationReference, setConfirmationReference] = useState("");
   const [dashboardRange, setDashboardRange] = useState<DashboardRange>("6m");
   void setDashboardRange;
   const [customStartDate, setCustomStartDate] = useState(() => {
@@ -402,6 +442,35 @@ function App() {
   useEffect(() => {
     document.documentElement.style.colorScheme = theme;
   }, [theme]);
+
+  useEffect(() => {
+    if (!profileMenuOpen) return;
+
+    function handleProfileMenuDismiss(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setProfileMenuOpen(false);
+        setCloseAccountConfirmOpen(false);
+      }
+    }
+
+    function handleOutsideClick(event: MouseEvent) {
+      if (
+        event.target instanceof Node &&
+        !profileMenuRef.current?.contains(event.target)
+      ) {
+        setProfileMenuOpen(false);
+        setCloseAccountConfirmOpen(false);
+      }
+    }
+
+    document.addEventListener("keydown", handleProfileMenuDismiss);
+    document.addEventListener("mousedown", handleOutsideClick);
+
+    return () => {
+      document.removeEventListener("keydown", handleProfileMenuDismiss);
+      document.removeEventListener("mousedown", handleOutsideClick);
+    };
+  }, [profileMenuOpen]);
 
   useEffect(() => {
     const dialog = transactionDialogRef.current;
@@ -540,6 +609,73 @@ function App() {
     };
   }, [session]);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadNotifications() {
+      if (!session?.user) {
+        setNotifications([]);
+        setNotificationsError("");
+        setNotificationsLoading(false);
+        return;
+      }
+
+      setNotificationsLoading(true);
+      setNotificationsError("");
+
+      const { data, error } = await supabase
+        .from("user_notifications")
+        .select("id, type, title, message, created_at, read_at")
+        .eq("user_id", session.user.id)
+        .order("created_at", { ascending: false })
+        .limit(50);
+
+      if (cancelled) return;
+
+      if (error) {
+        console.error("Unable to load notifications.", error);
+        setNotifications([]);
+        setNotificationsError(
+          "Notifications couldn't be loaded. Please refresh and try again.",
+        );
+      } else {
+        setNotifications((data ?? []) as UserNotification[]);
+      }
+
+      setNotificationsLoading(false);
+    }
+
+    void loadNotifications();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [session]);
+
+  useEffect(() => {
+    if (!notificationsOpen) return;
+
+    function dismissNotifications(event: MouseEvent | KeyboardEvent) {
+      if (event instanceof KeyboardEvent && event.key === "Escape") {
+        setNotificationsOpen(false);
+      } else if (
+        event instanceof MouseEvent &&
+        event.target instanceof Node &&
+        !notificationsRef.current?.contains(event.target)
+      ) {
+        setNotificationsOpen(false);
+      }
+    }
+
+    document.addEventListener("mousedown", dismissNotifications);
+    document.addEventListener("keydown", dismissNotifications);
+
+    return () => {
+      document.removeEventListener("mousedown", dismissNotifications);
+      document.removeEventListener("keydown", dismissNotifications);
+    };
+  }, [notificationsOpen]);
+
   // Load this user's account. The database controls the actual balance.
   useEffect(() => {
     let cancelled = false;
@@ -571,7 +707,31 @@ function App() {
           "We couldn't load your account details. Please refresh and try again.",
         );
       } else {
-        setCustomerAccount(data as CustomerAccount | null);
+        if (data) {
+          try {
+            const savedTransfers = readSavedTransfers(session.user.id);
+            const transferredCents = savedTransfers.reduce(
+              (total, transaction) =>
+                total + Math.round(Number(transaction.amount) * 100),
+              0,
+            );
+            const account = data as CustomerAccount;
+            setCustomerAccount({
+              ...account,
+              balance:
+                (Math.round(Number(account.balance) * 100) - transferredCents) /
+                100,
+            });
+          } catch (storageError) {
+            console.error("Unable to restore saved transfers.", storageError);
+            setCustomerAccount(null);
+            setAccountError(
+              "We couldn't restore your saved transfers. Clear local site data or contact support.",
+            );
+          }
+        } else {
+          setCustomerAccount(null);
+        }
 
         if (!data) {
           setAccountError(
@@ -621,9 +781,21 @@ function App() {
           "We couldn't load your transactions. Please refresh and try again.",
         );
       } else {
-        setDatabaseTransactions(
-          (data ?? []) as DatabaseTransaction[],
-        );
+        try {
+          const serverTransactions = (data ?? []) as DatabaseTransaction[];
+          const savedTransfers = readSavedTransfers(session.user.id);
+          const serverIds = new Set(serverTransactions.map(({ id }) => id));
+          setDatabaseTransactions([
+            ...savedTransfers.filter(({ id }) => !serverIds.has(id)),
+            ...serverTransactions,
+          ]);
+        } catch (storageError) {
+          console.error("Unable to restore saved transfers.", storageError);
+          setDatabaseTransactions((data ?? []) as DatabaseTransaction[]);
+          setTransactionsError(
+            "We couldn't restore your saved transfers. Clear local site data or contact support.",
+          );
+        }
       }
 
       setTransactionsLoading(false);
@@ -922,6 +1094,66 @@ function App() {
     setNotice(message);
   }
 
+  async function createNotification(
+    type: UserNotification["type"],
+    title: string,
+    message: string,
+  ) {
+    if (!session?.user) return false;
+
+    const { data, error } = await supabase
+      .from("user_notifications")
+      .insert({
+        user_id: session.user.id,
+        type,
+        title,
+        message,
+      })
+      .select("id, type, title, message, created_at, read_at")
+      .single();
+
+    if (error) {
+      console.error("Unable to create notification.", error);
+      setNotificationsError("A notification couldn't be saved.");
+      showMessage("The update completed, but its notification couldn't be saved.");
+      return false;
+    }
+
+    setNotifications((current) => [data as UserNotification, ...current].slice(0, 50));
+    setNotificationsError("");
+    return true;
+  }
+
+  async function markNotificationAsRead(notificationId: string) {
+    if (!session?.user) return;
+
+    const { data, error } = await supabase
+      .from("user_notifications")
+      .update({ read_at: new Date().toISOString() })
+      .eq("id", notificationId)
+      .eq("user_id", session.user.id)
+      .is("read_at", null)
+      .select("id, type, title, message, created_at, read_at")
+      .maybeSingle();
+
+    if (error) {
+      console.error("Unable to mark notification as read.", error);
+      setNotificationsError("This notification couldn't be marked as read.");
+      return;
+    }
+
+    if (!data) return;
+
+    setNotifications((current) =>
+      current.map((notification) =>
+        notification.id === notificationId
+          ? (data as UserNotification)
+          : notification,
+      ),
+    );
+    setNotificationsError("");
+  }
+
   function toggleTheme() {
     const nextTheme = theme === "light" ? "dark" : "light";
     try {
@@ -932,23 +1164,6 @@ function App() {
     }
     setTheme(nextTheme);
   }
-
-  function updateDashboardWidget(key: keyof DashboardWidgets, visible: boolean) {
-    const updatedWidgets = { ...dashboardWidgets, [key]: visible };
-    try {
-      localStorage.setItem(
-        "guardian-dashboard-widgets",
-        JSON.stringify(updatedWidgets),
-      );
-    } catch (error) {
-      console.error("Unable to save dashboard widget preferences.", error);
-      showMessage(
-        "The dashboard updated, but your widget preferences couldn't be saved.",
-      );
-    }
-    setDashboardWidgets(updatedWidgets);
-  }
-  void updateDashboardWidget;
 
   async function handleSubmitSupportRequest(
     event: FormEvent<HTMLFormElement>,
@@ -1110,7 +1325,16 @@ function App() {
     }
 
     setProfileName(cleanedName);
-    setProfileSaveMessage("Your profile has been updated.");
+    const notificationSaved = await createNotification(
+      "profile",
+      "Profile updated",
+      "Your profile details were updated successfully.",
+    );
+    setProfileSaveMessage(
+      notificationSaved
+        ? "Your profile has been updated."
+        : "Your profile was updated, but we couldn't save its notification.",
+    );
   }
 
   async function handleSignOut() {
@@ -1132,6 +1356,170 @@ function App() {
 
   function refreshPage() {
     window.location.reload();
+  }
+
+  function applyBeneficiary(beneficiary: Beneficiary) {
+    setTransferForm({
+      recipientName: beneficiary.name,
+      accountNumber: beneficiary.accountNumber,
+      routingNumber: beneficiary.routingNumber,
+      bankName: beneficiary.bankName,
+      amount: "",
+      remark: "",
+    });
+    setTransferError("");
+    setTransferStep("form");
+  }
+
+  function validateTransfer() {
+    const amountValue = Number(transferForm.amount);
+
+    if (!customerAccount) {
+      return "Your account balance is unavailable. Transfer can't continue.";
+    }
+
+    if (!transferForm.recipientName.trim()) {
+      return "Enter the recipient name.";
+    }
+
+    if (!transferForm.accountNumber.trim()) {
+      return "Enter the recipient account number.";
+    }
+
+    if (!transferForm.routingNumber.trim()) {
+      return "Enter the recipient routing number.";
+    }
+
+    if (!transferForm.bankName.trim()) {
+      return "Enter the recipient bank name.";
+    }
+
+    if (!Number.isFinite(amountValue) || amountValue <= 0) {
+      return "Transfer amount must be greater than zero.";
+    }
+
+    if (Math.abs(amountValue * 100 - Math.round(amountValue * 100)) > 0.000001) {
+      return "Enter an amount with no more than two decimal places.";
+    }
+
+    if (amountValue > Number(customerAccount?.balance ?? 0)) {
+      return "Transfer amount cannot exceed your available balance.";
+    }
+
+    return "";
+  }
+
+  function handleTransferContinue() {
+    const validationError = validateTransfer();
+    if (validationError) {
+      setTransferError(validationError);
+      return;
+    }
+
+    setTransferError("");
+    setTransferStep("review");
+  }
+
+  async function handleTransferSubmit() {
+    const validationError = validateTransfer();
+    if (validationError) {
+      setTransferError(validationError);
+      return;
+    }
+
+    if (!customerAccount) {
+      setTransferError("Your account balance is unavailable. Transfer can't continue.");
+      return;
+    }
+
+    if (!session?.user) {
+      setTransferError("Please sign in again before submitting this transfer.");
+      return;
+    }
+
+    const amountInCents = Math.round(Number(transferForm.amount) * 100);
+    const currentBalanceInCents = Math.round(
+      Number(customerAccount.balance) * 100,
+    );
+    const amount = amountInCents / 100;
+    const reference = `TRF-${Date.now().toString().slice(-8)}`;
+    const nextBeneficiary = {
+      id: `ben-${Date.now()}`,
+      name: transferForm.recipientName.trim(),
+      accountNumber: transferForm.accountNumber.trim(),
+      routingNumber: transferForm.routingNumber.trim(),
+      bankName: transferForm.bankName.trim(),
+      nickname: transferForm.recipientName.trim().split(" ")[0] || "Recipient",
+    };
+    const newTransaction: DatabaseTransaction = {
+      id: reference,
+      description: [
+        `Transfer to ${transferForm.recipientName.trim()}`,
+        transferForm.bankName.trim(),
+        `account ending ${transferForm.accountNumber.trim().slice(-4)}`,
+        `routing ending ${transferForm.routingNumber.trim().slice(-4)}`,
+        transferForm.remark.trim() ? `Remark: ${transferForm.remark.trim()}` : "",
+      ]
+        .filter(Boolean)
+        .join(" · "),
+      amount,
+      transaction_type: "debit",
+      status: "completed",
+      created_at: new Date().toISOString(),
+    };
+
+    try {
+      const savedTransfers = readSavedTransfers(session.user.id);
+      localStorage.setItem(
+        transferStorageKey(session.user.id),
+        JSON.stringify([
+          newTransaction,
+          ...savedTransfers.filter(({ id }) => id !== newTransaction.id),
+        ]),
+      );
+    } catch (storageError) {
+      console.error("Unable to save the transfer for this device.", storageError);
+      setTransferError(
+        "We couldn't save this transfer on your device. Check browser storage and try again.",
+      );
+      return;
+    }
+
+    setSavedBeneficiaries((current) => {
+      const existing = current.some(
+        (beneficiary) =>
+          beneficiary.accountNumber === nextBeneficiary.accountNumber &&
+          beneficiary.routingNumber === nextBeneficiary.routingNumber,
+      );
+
+      return existing ? current : [nextBeneficiary, ...current];
+    });
+    setCustomerAccount({
+      ...customerAccount,
+      balance: (currentBalanceInCents - amountInCents) / 100,
+    });
+    setDatabaseTransactions((current) => [newTransaction, ...current]);
+    setSearch("");
+    setTransactionSearch("");
+    setTransactionTypeFilter("all");
+    setTransactionStatusFilter("all");
+    setTransactionStartDate("");
+    setTransactionEndDate("");
+    setConfirmationReference(reference);
+    setTransferStep("confirmed");
+    setTransferError("");
+    await createNotification(
+      "transaction",
+      "Transfer completed",
+      `${formatMoney(amount)} sent to ${transferForm.recipientName.trim()}. Reference ${reference}.`,
+    );
+  }
+
+  function resetTransferFlow() {
+    setTransferForm(initialTransferForm);
+    setTransferStep("form");
+    setTransferError("");
+    setConfirmationReference("");
   }
 
   function renderTransactionRows(
@@ -1288,6 +1676,9 @@ function App() {
   }
 
   const email = session.user.email || "No email available";
+  const unreadNotificationCount = notifications.filter(
+    (notification) => !notification.read_at,
+  ).length;
   const displayName = profileName.trim() || "Customer";
   const initials = displayName
     .split(/\s+/)
@@ -1303,21 +1694,6 @@ function App() {
     /^https?:\/\//i.test(avatarCandidate)
       ? avatarCandidate
       : "";
-  const widgetOptions: {
-    key: keyof DashboardWidgets;
-    label: string;
-  }[] = [
-    { key: "balance", label: "Account balance" },
-    { key: "income", label: "Money in" },
-    { key: "spending", label: "Money out" },
-    { key: "cashflow", label: "Income & expenses chart" },
-    { key: "balanceTrend", label: "Balance trend" },
-    { key: "categories", label: "Spending categories" },
-    { key: "account", label: "Account details" },
-    { key: "quickActions", label: "Quick actions" },
-  ];
-  void widgetOptions;
-
   return (
     <div className="app-shell" data-theme={theme}>
       {menuOpen && (
@@ -1454,17 +1830,101 @@ function App() {
               )}
             </label>
 
-            <button
-              type="button"
-              className="icon-button notification-button"
-              aria-label="Notifications"
-              onClick={() =>
-                showMessage("You have no new notifications.")
-              }
-            >
-              <Bell size={20} />
-              <span className="notification-dot" aria-hidden="true" />
-            </button>
+            <div className="notifications-container" ref={notificationsRef}>
+              <button
+                type="button"
+                className="icon-button notification-button"
+                aria-label={
+                  unreadNotificationCount > 0
+                    ? `Notifications, ${unreadNotificationCount} unread`
+                    : "Notifications"
+                }
+                aria-expanded={notificationsOpen}
+                aria-controls="notifications-panel"
+                onClick={() => setNotificationsOpen((open) => !open)}
+              >
+                <Bell size={20} />
+                {unreadNotificationCount > 0 && (
+                  <span className="notification-count" aria-hidden="true">
+                    {unreadNotificationCount > 99
+                      ? "99+"
+                      : unreadNotificationCount}
+                  </span>
+                )}
+              </button>
+              {notificationsOpen && (
+                <section
+                  className="notifications-panel"
+                  id="notifications-panel"
+                  aria-label="Notifications"
+                >
+                  <div className="notifications-panel-header">
+                    <div>
+                      <h2>Notifications</h2>
+                      <span>
+                        {unreadNotificationCount === 0
+                          ? "You're all caught up"
+                          : `${unreadNotificationCount} unread`}
+                      </span>
+                    </div>
+                  </div>
+                  {notificationsError && (
+                    <p className="notifications-error" role="alert">
+                      {notificationsError}
+                    </p>
+                  )}
+                  {notificationsLoading ? (
+                    <p className="notifications-empty" role="status">
+                      Loading notifications...
+                    </p>
+                  ) : notifications.length === 0 ? (
+                    <p className="notifications-empty">
+                      No notifications yet.
+                    </p>
+                  ) : (
+                    <ul className="notifications-list">
+                      {notifications.map((notification) => (
+                        <li
+                          key={notification.id}
+                          className={
+                            notification.read_at
+                              ? "notification-item"
+                              : "notification-item unread"
+                          }
+                        >
+                          <div className="notification-item-content">
+                            <strong>{notification.title}</strong>
+                            <p>{notification.message}</p>
+                            <time dateTime={notification.created_at}>
+                              {new Date(notification.created_at).toLocaleString(
+                                "en-US",
+                                {
+                                  month: "short",
+                                  day: "numeric",
+                                  hour: "numeric",
+                                  minute: "2-digit",
+                                },
+                              )}
+                            </time>
+                          </div>
+                          {!notification.read_at && (
+                            <button
+                              type="button"
+                              className="notification-mark-read"
+                              onClick={() =>
+                                void markNotificationAsRead(notification.id)
+                              }
+                            >
+                              Mark as read
+                            </button>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </section>
+              )}
+            </div>
 
             <button
               type="button"
@@ -1478,37 +1938,108 @@ function App() {
               {theme === "light" ? <Moon size={19} /> : <Sun size={19} />}
             </button>
 
-            <button
-              type="button"
-              className="topbar-profile"
-              onClick={() => navigate("My Profile")}
-              aria-label={`Open profile for ${displayName}`}
-            >
-              <span className="avatar topbar-profile-avatar">
-                {profileAvatarUrl &&
-                failedProfileAvatarUrl !== profileAvatarUrl ? (
-                  <img
-                    src={profileAvatarUrl}
-                    alt=""
-                    referrerPolicy="no-referrer"
-                    onError={() => setFailedProfileAvatarUrl(profileAvatarUrl)}
-                  />
-                ) : (
-                  initials
-                )}
-              </span>
-              <span className="topbar-profile-copy">
-                <strong>{displayName}</strong>
-                <small>Personal account</small>
-              </span>
-              <ChevronDown size={16} />
-            </button>
+            <div className="profile-menu-container" ref={profileMenuRef}>
+              <button
+                type="button"
+                className="topbar-profile topbar-profile-borderless"
+                onClick={() => {
+                  setProfileMenuOpen((open) => !open);
+                  setCloseAccountConfirmOpen(false);
+                }}
+                aria-label={`Profile options for ${displayName}`}
+                aria-haspopup="menu"
+                aria-expanded={profileMenuOpen}
+                aria-controls="profile-options-menu"
+              >
+                <span className="avatar topbar-profile-avatar">
+                  {profileAvatarUrl &&
+                  failedProfileAvatarUrl !== profileAvatarUrl ? (
+                    <img
+                      src={profileAvatarUrl}
+                      alt=""
+                      referrerPolicy="no-referrer"
+                      onError={() => setFailedProfileAvatarUrl(profileAvatarUrl)}
+                    />
+                  ) : (
+                    initials
+                  )}
+                </span>
+                <span className="topbar-profile-copy">
+                  <strong>{displayName}</strong>
+                  <small>Personal account</small>
+                </span>
+                <ChevronDown size={16} />
+              </button>
+
+              {profileMenuOpen && (
+                <div
+                  className="profile-options-menu"
+                  id="profile-options-menu"
+                  role="menu"
+                  aria-label="Profile options"
+                >
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      navigate("My Profile");
+                      setProfileMenuOpen(false);
+                    }}
+                  >
+                    Profile details
+                  </button>
+                  <button
+                    type="button"
+                    className="profile-close-account"
+                    role="menuitem"
+                    onClick={() =>
+                      setCloseAccountConfirmOpen((open) => !open)
+                    }
+                    aria-expanded={closeAccountConfirmOpen}
+                  >
+                    Close account
+                  </button>
+
+                  {closeAccountConfirmOpen && (
+                    <div
+                      className="close-account-confirmation"
+                      role="group"
+                      aria-label="Confirm close account"
+                    >
+                      <strong>Delete</strong>
+                      <div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setProfileMenuOpen(false);
+                            setCloseAccountConfirmOpen(false);
+                            showMessage(
+                              "Your account data was not changed. Contact customer support to request account closure.",
+                            );
+                          }}
+                        >
+                          Yes
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setCloseAccountConfirmOpen(false)}
+                        >
+                          No
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         </header>
 
         <div className="page-heading">
           <div>
-            <p className="eyebrow">ONLINE BANKING</p>
+            {activePage !== "Dashboard" && (
+              <p className="eyebrow">ONLINE BANKING</p>
+            )}
             <h1>{activePage}</h1>
             <p className="page-subtitle">
               {activePage === "Dashboard"
@@ -1527,16 +2058,18 @@ function App() {
             </p>
           </div>
 
-          <div className="page-heading-date">
-            <CalendarDays size={17} />
-            <span>
-              {new Date().toLocaleDateString("en-US", {
-                month: "short",
-                day: "numeric",
-                year: "numeric",
-              })}
-            </span>
-          </div>
+          {activePage !== "Dashboard" && (
+            <div className="page-heading-date">
+              <CalendarDays size={17} />
+              <span>
+                {new Date().toLocaleDateString("en-US", {
+                  month: "short",
+                  day: "numeric",
+                  year: "numeric",
+                })}
+              </span>
+            </div>
+          )}
         </div>
 
         {notice && (
@@ -1560,48 +2093,20 @@ function App() {
                 <h2>Welcome back, {displayName.split(" ")[0]}!</h2>
                 <p>Here is a summary of your banking activity.</p>
               </div>
-              <div className="widget-customizer">
-                <button
-                  type="button"
-                  className="button-secondary widget-customizer-toggle"
-                  aria-expanded={widgetMenuOpen}
-                  aria-controls="dashboard-widget-options"
-                  onClick={() => setWidgetMenuOpen((open) => !open)}
-                >
-                  <SlidersHorizontal size={16} />
-                  Customize widgets
-                  <ChevronDown size={15} />
-                </button>
-                {widgetMenuOpen && (
-                  <div
-                    className="widget-customizer-menu"
-                    id="dashboard-widget-options"
-                    aria-label="Dashboard widgets"
-                  >
-                    <strong>Show on dashboard</strong>
-                    {widgetOptions.map(({ key, label }) => (
-                      <label key={key}>
-                        <input
-                          type="checkbox"
-                          checked={dashboardWidgets[key]}
-                          onChange={(event) =>
-                            updateDashboardWidget(key, event.target.checked)
-                          }
-                        />
-                        <span>{label}</span>
-                      </label>
-                    ))}
-                  </div>
-                )}
-              </div>
             </div>
 
-            <section className="dashboard-filter-bar" aria-label="Dashboard date range">
-              <div className="dashboard-filter-heading">
-                <CalendarDays size={18} />
-                <div>
+            <section className="activity-period" aria-label="Dashboard date range">
+              <button
+                type="button"
+                className="activity-period-toggle"
+                aria-expanded={activityPeriodOpen}
+                aria-controls="activity-period-options"
+                onClick={() => setActivityPeriodOpen((open) => !open)}
+              >
+                <CalendarDays size={16} aria-hidden="true" />
+                <span className="activity-period-toggle-copy">
                   <strong>Activity period</strong>
-                  <span>
+                  <small>
                     {dateRange.valid
                       ? `${new Date(`${dateRange.start}T00:00:00`).toLocaleDateString(
                           "en-US",
@@ -1611,57 +2116,66 @@ function App() {
                           { month: "short", day: "numeric", year: "numeric" },
                         )}`
                       : "Choose a valid date range"}
-                  </span>
-                </div>
-              </div>
-              <div className="dashboard-date-controls">
-                <div className="dashboard-range-options" aria-label="Quick date ranges">
-                  {(
-                    [
-                      ["30d", "30 days"],
-                      ["90d", "90 days"],
-                      ["6m", "6 months"],
-                      ["12m", "12 months"],
-                      ["custom", "Custom"],
-                    ] as const
-                  ).map(([range, label]) => (
-                    <button
-                      type="button"
-                      key={range}
-                      className={`dashboard-range-button ${
-                        dashboardRange === range ? "active" : ""
-                      }`}
-                      aria-pressed={dashboardRange === range}
-                      onClick={() => setDashboardRange(range)}
-                    >
-                      {label}
-                    </button>
-                  ))}
-                </div>
-                {dashboardRange === "custom" && (
-                  <div className="dashboard-custom-dates">
-                    <label>
-                      <span>From</span>
-                      <input
-                        type="date"
-                        value={customStartDate}
-                        max={customEndDate}
-                        onChange={(event) => setCustomStartDate(event.target.value)}
-                      />
-                    </label>
-                    <label>
-                      <span>To</span>
-                      <input
-                        type="date"
-                        value={customEndDate}
-                        min={customStartDate}
-                        max={toDateInputValue(new Date())}
-                        onChange={(event) => setCustomEndDate(event.target.value)}
-                      />
-                    </label>
+                  </small>
+                </span>
+                <ChevronDown
+                  size={15}
+                  className={`activity-period-chevron ${activityPeriodOpen ? "open" : ""}`}
+                  aria-hidden="true"
+                />
+              </button>
+              {activityPeriodOpen && (
+                <div className="dashboard-filter-bar" id="activity-period-options">
+                  <div className="dashboard-date-controls">
+                    <div className="dashboard-range-options" aria-label="Quick date ranges">
+                      {(
+                        [
+                          ["30d", "30 days"],
+                          ["90d", "90 days"],
+                          ["6m", "6 months"],
+                          ["12m", "12 months"],
+                          ["custom", "Custom"],
+                        ] as const
+                      ).map(([range, label]) => (
+                        <button
+                          type="button"
+                          key={range}
+                          className={`dashboard-range-button ${
+                            dashboardRange === range ? "active" : ""
+                          }`}
+                          aria-pressed={dashboardRange === range}
+                          onClick={() => setDashboardRange(range)}
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                    {dashboardRange === "custom" && (
+                      <div className="dashboard-custom-dates">
+                        <label>
+                          <span>From</span>
+                          <input
+                            type="date"
+                            value={customStartDate}
+                            max={customEndDate}
+                            onChange={(event) => setCustomStartDate(event.target.value)}
+                          />
+                        </label>
+                        <label>
+                          <span>To</span>
+                          <input
+                            type="date"
+                            value={customEndDate}
+                            min={customStartDate}
+                            max={toDateInputValue(new Date())}
+                            onChange={(event) => setCustomEndDate(event.target.value)}
+                          />
+                        </label>
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
+                </div>
+              )}
             </section>
 
             {(dashboardWidgets.balance ||
@@ -1679,9 +2193,9 @@ function App() {
                         aria-label={
                           showBalance ? "Hide account balances" : "Show account balances"
                         }
+                        title={showBalance ? "Hide account balances" : "Show account balances"}
                       >
                         {showBalance ? <Eye size={19} /> : <EyeOff size={19} />}
-                        <span>{showBalance ? "Hide balance" : "Show balance"}</span>
                       </button>
                     </div>
 
@@ -1694,7 +2208,7 @@ function App() {
                         <p>{accountError}</p>
                         <button
                           type="button"
-                          className="balance-visibility"
+                          className="button-secondary"
                           onClick={refreshPage}
                         >
                           Refresh page
@@ -1774,6 +2288,56 @@ function App() {
                   </section>
                 )}
               </div>
+            )}
+
+            {dashboardWidgets.quickActions && (
+              <section className="quick-actions-panel dashboard-quick-actions" aria-label="Quick actions">
+                <div className="quick-actions">
+                  <button
+                    type="button"
+                    className="quick-action quick-action-transfer"
+                    onClick={() => navigate("Transfers")}
+                  >
+                    <span className="quick-action-icon">
+                      <ArrowLeftRight size={20} />
+                    </span>
+                    <span className="quick-action-copy">
+                      <strong>Transfer Money</strong>
+                    </span>
+                    <ArrowUpRight className="quick-action-arrow" size={17} />
+                  </button>
+
+                  <button
+                    type="button"
+                    className="quick-action quick-action-invest"
+                    onClick={() =>
+                      showMessage("Investment services are not available yet.")
+                    }
+                  >
+                    <span className="quick-action-icon">
+                      <TrendingUp size={20} />
+                    </span>
+                    <span className="quick-action-copy">
+                      <strong>Invest</strong>
+                    </span>
+                    <ArrowUpRight className="quick-action-arrow" size={17} />
+                  </button>
+
+                  <button
+                    type="button"
+                    className="quick-action quick-action-save"
+                    onClick={() => navigate("Accounts")}
+                  >
+                    <span className="quick-action-icon">
+                      <PiggyBank size={20} />
+                    </span>
+                    <span className="quick-action-copy">
+                      <strong>Save</strong>
+                    </span>
+                    <ArrowDownToLine className="quick-action-arrow" size={17} />
+                  </button>
+                </div>
+              </section>
             )}
 
             {(dashboardWidgets.cashflow || dashboardWidgets.balanceTrend) && (
@@ -2082,67 +2646,6 @@ function App() {
                     </section>
                   )}
 
-                  {dashboardWidgets.quickActions && (
-                    <section className="panel quick-actions-panel">
-                      <div className="panel-header">
-                        <div>
-                          <h2>Quick actions</h2>
-                          <p>Explore available sections</p>
-                        </div>
-                        <SlidersHorizontal size={19} />
-                      </div>
-
-                      <div className="quick-actions">
-                        <button
-                          type="button"
-                          className="quick-action"
-                          onClick={() => navigate("Accounts")}
-                        >
-                          <span className="quick-action-icon">
-                            <Landmark size={19} />
-                          </span>
-                          <span>Accounts</span>
-                          <ArrowUpRight size={16} />
-                        </button>
-
-                        <button
-                          type="button"
-                          className="quick-action"
-                          onClick={() => navigate("Transactions")}
-                        >
-                          <span className="quick-action-icon">
-                            <Activity size={19} />
-                          </span>
-                          <span>Transactions</span>
-                          <ArrowUpRight size={16} />
-                        </button>
-
-                        <button
-                          type="button"
-                          className="quick-action"
-                          onClick={() => navigate("My Profile")}
-                        >
-                          <span className="quick-action-icon">
-                            <UserRound size={19} />
-                          </span>
-                          <span>My profile</span>
-                          <ArrowUpRight size={16} />
-                        </button>
-
-                        <button
-                          type="button"
-                          className="quick-action"
-                          onClick={() => navigate("Transfers")}
-                        >
-                          <span className="quick-action-icon">
-                            <ArrowLeftRight size={19} />
-                          </span>
-                          <span>Transfers</span>
-                          <ArrowUpRight size={16} />
-                        </button>
-                      </div>
-                    </section>
-                  )}
                 </div>
               </div>
             )}
@@ -2221,7 +2724,20 @@ function App() {
 
                   <div className="account-detail-grid">
                     <div className="account-detail">
-                      <span>Available balance</span>
+                      <div className="account-balance-heading">
+                        <span>Available balance</span>
+                        <button
+                          type="button"
+                          className="balance-visibility account-balance-visibility"
+                          onClick={() => setShowBalance((current) => !current)}
+                          aria-label={
+                            showBalance ? "Hide account balances" : "Show account balances"
+                          }
+                          title={showBalance ? "Hide account balances" : "Show account balances"}
+                        >
+                          {showBalance ? <Eye size={17} /> : <EyeOff size={17} />}
+                        </button>
+                      </div>
                       <strong>
                         {showBalance
                           ? formatMoney(Number(customerAccount.balance))
@@ -2245,15 +2761,6 @@ function App() {
                       <strong className="account-detail-status">Active</strong>
                     </div>
                   </div>
-
-                  <button
-                    type="button"
-                    className="button-secondary"
-                    onClick={() => setShowBalance((current) => !current)}
-                  >
-                    {showBalance ? <EyeOff size={17} /> : <Eye size={17} />}
-                    {showBalance ? "Hide balance" : "Show balance"}
-                  </button>
                 </>
               ) : (
                 <div className="empty-state">
@@ -2572,22 +3079,328 @@ function App() {
 
         {activePage === "Transfers" && (
           <section className="page-content transfer-content">
-            <section className="panel transfer-unavailable-panel">
-              <span className="transfer-unavailable-icon" aria-hidden="true">
-                <ArrowLeftRight size={25} />
-              </span>
-              <h2>Transfers are unavailable</h2>
-              <p>
-                Contact customer support for assistance with transfers.
-              </p>
-              <button
-                type="button"
-                className="button-primary"
-                onClick={() => navigate("Customer Support")}
-              >
-                Contact support <Headset size={17} />
-              </button>
-            </section>
+            <ol className="transfer-progress" aria-label="Transfer progress">
+              {(["form", "review", "confirmed"] as const).map((step, index) => {
+                const stepNumber =
+                  transferStep === "form"
+                    ? 0
+                    : transferStep === "review"
+                      ? 1
+                      : 2;
+                const isComplete = index < stepNumber;
+                const isCurrent = index === stepNumber;
+                const labels = ["Recipient & amount", "Review details", "Confirmation"];
+
+                return (
+                  <li
+                    key={step}
+                    className={`${isCurrent ? "current" : ""} ${
+                      isComplete ? "complete" : ""
+                    }`}
+                    aria-current={isCurrent ? "step" : undefined}
+                  >
+                    <span className="transfer-progress-number">
+                      {isComplete ? <CheckCircle2 size={16} /> : index + 1}
+                    </span>
+                    <span className="transfer-progress-label">{labels[index]}</span>
+                  </li>
+                );
+              })}
+            </ol>
+
+            <div className="transfer-layout">
+              <section className="panel transfer-panel">
+                <div className="panel-header">
+                  <div>
+                    <span className="transfer-section-kicker">PAYMENTS</span>
+                    <h2>
+                      {transferStep === "confirmed"
+                        ? "Transfer confirmed"
+                        : transferStep === "review"
+                          ? "Review your transfer"
+                          : "Make a transfer"}
+                    </h2>
+                    <p>
+                      {transferStep === "confirmed"
+                        ? "Your transfer request has been completed."
+                        : "Create a transfer request for a saved or new recipient."}
+                    </p>
+                  </div>
+                </div>
+
+                {transferStep === "confirmed" ? (
+                  <div className="transfer-confirmation">
+                    <div className="transfer-confirmation-icon" aria-hidden="true">
+                      <CheckCircle2 size={26} />
+                    </div>
+                    <h3>Transfer confirmed</h3>
+                    <p>
+                      Your Transfer request for {transferForm.recipientName || "the recipient"} has been Completed.
+                    </p>
+                    <div className="transfer-reference">
+                      <span>Status</span>
+                      <strong>Confirmed</strong>
+                    </div>
+                    <div className="transfer-reference">
+                      <span>Reference</span>
+                      <strong>{confirmationReference}</strong>
+                    </div>
+                    <button
+                      type="button"
+                      className="button-primary"
+                      onClick={resetTransferFlow}
+                    >
+                      Start another transfer
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <div className="saved-beneficiaries">
+                      <div className="saved-beneficiaries-header">
+                        <div>
+                          <strong>Saved beneficiaries</strong>
+                          <span>Choose a recipient to fill in their details</span>
+                        </div>
+                        <button
+                          type="button"
+                          className="text-button"
+                          onClick={() => resetTransferFlow()}
+                        >
+                          New recipient
+                        </button>
+                      </div>
+
+                      <div className="beneficiary-list">
+                        {savedBeneficiaries.map((beneficiary) => (
+                          <button
+                            key={beneficiary.id}
+                            type="button"
+                            className="beneficiary-item"
+                            onClick={() => applyBeneficiary(beneficiary)}
+                          >
+                            <span className="beneficiary-avatar" aria-hidden="true">
+                              {beneficiary.nickname.slice(0, 1).toUpperCase()}
+                            </span>
+                            <span className="beneficiary-copy">
+                              <strong>{beneficiary.name}</strong>
+                              <small>{beneficiary.bankName}</small>
+                            </span>
+                            <ArrowUpRight size={15} />
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="transfer-form-panel">
+                      {transferError && (
+                        <div className="form-error" role="alert">
+                          {transferError}
+                        </div>
+                      )}
+
+                      {transferStep === "form" ? (
+                        <form
+                          className="transfer-form"
+                          onSubmit={(event) => {
+                            event.preventDefault();
+                            handleTransferContinue();
+                          }}
+                        >
+                          <div className="form-grid two-column">
+                            <label>
+                              <span>Recipient name</span>
+                              <input
+                                type="text"
+                                value={transferForm.recipientName}
+                                onChange={(event) =>
+                                  setTransferForm((current) => ({
+                                    ...current,
+                                    recipientName: event.target.value,
+                                  }))
+                                }
+                                placeholder="Jane Doe"
+                              />
+                            </label>
+
+                            <label>
+                              <span>Bank name</span>
+                              <input
+                                type="text"
+                                value={transferForm.bankName}
+                                onChange={(event) =>
+                                  setTransferForm((current) => ({
+                                    ...current,
+                                    bankName: event.target.value,
+                                  }))
+                                }
+                                placeholder="Guardian Federal Bank"
+                              />
+                            </label>
+
+                            <label>
+                                <span>Account number</span>
+                              <input
+                                type="text"
+                                inputMode="numeric"
+                                value={transferForm.accountNumber}
+                                onChange={(event) =>
+                                  setTransferForm((current) => ({
+                                    ...current,
+                                    accountNumber: event.target.value,
+                                  }))
+                                }
+                                placeholder="9876543210"
+                              />
+                            </label>
+
+                            <label>
+                                <span>Routing number</span>
+                              <input
+                                type="text"
+                                inputMode="numeric"
+                                value={transferForm.routingNumber}
+                                onChange={(event) =>
+                                  setTransferForm((current) => ({
+                                    ...current,
+                                    routingNumber: event.target.value,
+                                  }))
+                                }
+                                placeholder="021000021"
+                              />
+                            </label>
+                          </div>
+
+                          <div className="form-grid two-column">
+                            <label>
+                              <span>Amount</span>
+                              <div className="currency-input">
+                                <span>{currency}</span>
+                                <input
+                                  type="number"
+                                  min="0.01"
+                                  step="0.01"
+                                  inputMode="decimal"
+                                  value={transferForm.amount}
+                                  onChange={(event) =>
+                                    setTransferForm((current) => ({
+                                      ...current,
+                                      amount: event.target.value,
+                                    }))
+                                  }
+                                  placeholder="0.00"
+                                />
+                              </div>
+                            </label>
+
+                            <label>
+                              <span>Remark</span>
+                              <input
+                                type="text"
+                                value={transferForm.remark}
+                                onChange={(event) =>
+                                  setTransferForm((current) => ({
+                                    ...current,
+                                    remark: event.target.value,
+                                  }))
+                                }
+                                placeholder="Rent payment"
+                              />
+                            </label>
+                          </div>
+
+                          <div className="transfer-actions">
+                            <button
+                              type="button"
+                              className="button-secondary"
+                              onClick={() => setTransferForm(initialTransferForm)}
+                            >
+                              Clear
+                            </button>
+                            <button type="submit" className="button-primary">
+                              Review transfer
+                            </button>
+                          </div>
+                        </form>
+                      ) : (
+                        <div className="transfer-review">
+                          <div className="review-summary">
+                            <div>
+                              <span>Recipient</span>
+                              <strong>{transferForm.recipientName}</strong>
+                            </div>
+                            <div>
+                              <span>Bank</span>
+                              <strong>{transferForm.bankName}</strong>
+                            </div>
+                            <div>
+                              <span>Account</span>
+                              <strong>•••• {transferForm.accountNumber.slice(-4) || "0000"}</strong>
+                            </div>
+                            <div>
+                              <span>Routing</span>
+                              <strong>{transferForm.routingNumber}</strong>
+                            </div>
+                            <div>
+                              <span>Amount</span>
+                              <strong>{formatMoney(Number(transferForm.amount || 0))}</strong>
+                            </div>
+                            <div>
+                              <span>Remark</span>
+                              <strong>{transferForm.remark || "No remark added"}</strong>
+                            </div>
+                          </div>
+
+                          <div className="transfer-actions">
+                            <button
+                              type="button"
+                              className="button-secondary"
+                              onClick={() => setTransferStep("form")}
+                            >
+                              Edit
+                            </button>
+                            <button
+                              type="button"
+                              className="button-primary"
+                              onClick={handleTransferSubmit}
+                            >
+                              Submit transfer request
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </>
+                )}
+              </section>
+
+              <aside className="panel transfer-side-panel">
+                <div className="panel-header">
+                  <div>
+                    <h2>Before you send</h2>
+                    <p>Check the details before confirming</p>
+                  </div>
+                  <ShieldCheck size={20} />
+                </div>
+
+                <ul className="transfer-checklist">
+                  <li>Verify the recipient and bank details carefully.</li>
+                  <li>Confirm the amount is within your available balance.</li>
+                  <li>Review the transfer before submitting it.</li>
+                </ul>
+
+                <div className="transfer-balance-card">
+                  <span>Available balance</span>
+                  <strong>
+                    {showBalance
+                      ? formatMoney(Number(customerAccount?.balance ?? 0))
+                      : maskedBalance}
+                  </strong>
+                </div>
+                <p className="transfer-request-note">
+                  The displayed balance and transaction history update immediately. Requests are not submitted to your bank and no external funds are moved.
+                </p>
+              </aside>
+            </div>
           </section>
         )}
 
