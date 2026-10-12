@@ -40,6 +40,7 @@ import {
 } from "lucide-react";
 import "./index.css";
 import Auth from "./Auth";
+import InvestmentsPage from "./InvestmentsPage";
 import { supabase } from "./lib/supabase";
 
 type DatabaseTransaction = {
@@ -114,6 +115,7 @@ type GeneratedCardDetails = {
 type PageName =
   | "Dashboard"
   | "Accounts"
+  | "Investments"
   | "Transactions"
   | "Transfers"
   | "Payments"
@@ -303,6 +305,7 @@ const navigation: {
     items: [
       { name: "Dashboard", icon: Home },
       { name: "Accounts", icon: Landmark },
+      { name: "Investments", icon: TrendingUp },
       { name: "Transactions", icon: ArrowLeftRight },
       { name: "Transfers", icon: ArrowUpRight },
       { name: "Payments", icon: CreditCard },
@@ -2046,6 +2049,8 @@ function App() {
                 ? "Here's what's happening with your account."
                 : activePage === "Accounts"
                   ? "View your account information."
+                  : activePage === "Investments"
+                    ? "Explore simulated investments and track your goals."
                   : activePage === "Transactions"
                     ? "Review and filter your transaction history."
                     : activePage === "My Profile"
@@ -2084,6 +2089,14 @@ function App() {
               <X size={17} />
             </button>
           </div>
+        )}
+
+        {activePage === "Investments" && (
+          <InvestmentsPage
+            userId={session.user.id}
+            currency={currency}
+            onNotice={showMessage}
+          />
         )}
 
         {activePage === "Dashboard" && (
@@ -2310,9 +2323,7 @@ function App() {
                   <button
                     type="button"
                     className="quick-action quick-action-invest"
-                    onClick={() =>
-                      showMessage("Investment services are not available yet.")
-                    }
+                    onClick={() => navigate("Investments")}
                   >
                     <span className="quick-action-icon">
                       <TrendingUp size={20} />
