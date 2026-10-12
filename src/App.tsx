@@ -6,6 +6,7 @@ import {
   Activity,
   ArrowDownLeft,
   ArrowLeftRight,
+  Home,
   ArrowUpRight,
   Bell,
   CalendarDays,
@@ -29,8 +30,8 @@ import {
   ShieldCheck,
   Snowflake,
   SlidersHorizontal,
-  TrendingUp,
   Sun,
+  TrendingUp,
   UserRound,
   Wallet,
   X,
@@ -38,9 +39,6 @@ import {
 import "./index.css";
 import Auth from "./Auth";
 import { supabase } from "./lib/supabase";
-
-void Activity;
-void TrendingUp;
 
 type DatabaseTransaction = {
   id: string;
@@ -67,6 +65,7 @@ type GeneratedCardDetails = {
 };
 
 type PageName =
+  | "Dashboard"
   | "Accounts"
   | "Transactions"
   | "Transfers"
@@ -94,7 +93,6 @@ type DashboardWidgets = {
   spending: boolean;
   cashflow: boolean;
   balanceTrend: boolean;
-  activity: boolean;
   categories: boolean;
   account: boolean;
   quickActions: boolean;
@@ -192,7 +190,6 @@ const defaultDashboardWidgets: DashboardWidgets = {
   spending: true,
   cashflow: true,
   balanceTrend: true,
-  activity: true,
   categories: true,
   account: true,
   quickActions: true,
@@ -238,10 +235,6 @@ function readDashboardWidgets(): DashboardWidgets {
         typeof saved.balanceTrend === "boolean"
           ? saved.balanceTrend
           : defaultDashboardWidgets.balanceTrend,
-      activity:
-        typeof saved.activity === "boolean"
-          ? saved.activity
-          : defaultDashboardWidgets.activity,
       categories:
         typeof saved.categories === "boolean"
           ? saved.categories
@@ -302,6 +295,7 @@ const navigation: {
   {
     label: "BANKING",
     items: [
+      { name: "Dashboard", icon: Home },
       { name: "Accounts", icon: Landmark },
       { name: "Transactions", icon: ArrowLeftRight },
       { name: "Transfers", icon: ArrowUpRight },
@@ -346,7 +340,7 @@ function App() {
   const [supportSubject, setSupportSubject] = useState("");
   const [supportCategory, setSupportCategory] = useState("Account access");
   const [supportMessage, setSupportMessage] = useState("");
-  const [activePage, setActivePage] = useState<PageName>("Accounts");
+  const [activePage, setActivePage] = useState<PageName>("Dashboard");
   const [theme, setTheme] = useState<ThemePreference>(readThemePreference);
   const [dashboardWidgets, setDashboardWidgets] =
     useState<DashboardWidgets>(readDashboardWidgets);
@@ -1129,7 +1123,7 @@ function App() {
 
     setCustomerAccount(null);
     setDatabaseTransactions([]);
-    setActivePage("Accounts");
+    setActivePage("Dashboard");
     setSearch("");
     setTransactionSearch("");
     setMenuOpen(false);
@@ -1318,7 +1312,6 @@ function App() {
     { key: "spending", label: "Money out" },
     { key: "cashflow", label: "Income & expenses chart" },
     { key: "balanceTrend", label: "Balance trend" },
-    { key: "activity", label: "Recent activity" },
     { key: "categories", label: "Spending categories" },
     { key: "account", label: "Account details" },
     { key: "quickActions", label: "Quick actions" },
@@ -1518,17 +1511,19 @@ function App() {
             <p className="eyebrow">ONLINE BANKING</p>
             <h1>{activePage}</h1>
             <p className="page-subtitle">
-              {activePage === "Accounts"
-                ? "View your account information."
-                : activePage === "Transactions"
-                  ? "Review and filter your transaction history."
-                  : activePage === "My Profile"
-                    ? "Manage your personal information."
-                    : activePage === "Settings"
-                      ? "Manage your profile and preferences."
-                      : activePage === "Customer Support"
-                        ? "Find answers and get help with your account."
-                        : `Explore your ${activePage.toLowerCase()} workspace.`}
+              {activePage === "Dashboard"
+                ? "Here's what's happening with your account."
+                : activePage === "Accounts"
+                  ? "View your account information."
+                  : activePage === "Transactions"
+                    ? "Review and filter your transaction history."
+                    : activePage === "My Profile"
+                      ? "Manage your personal information."
+                      : activePage === "Settings"
+                        ? "Manage your profile and preferences."
+                        : activePage === "Customer Support"
+                          ? "Find answers and get help with your account."
+                          : `Explore your ${activePage.toLowerCase()} workspace.`}
             </p>
           </div>
 
@@ -1556,6 +1551,602 @@ function App() {
               <X size={17} />
             </button>
           </div>
+        )}
+
+        {activePage === "Dashboard" && (
+          <section className="dashboard-content" aria-label="Dashboard overview">
+            <div className="welcome-row">
+              <div>
+                <h2>Welcome back, {displayName.split(" ")[0]}!</h2>
+                <p>Here is a summary of your banking activity.</p>
+              </div>
+              <div className="widget-customizer">
+                <button
+                  type="button"
+                  className="button-secondary widget-customizer-toggle"
+                  aria-expanded={widgetMenuOpen}
+                  aria-controls="dashboard-widget-options"
+                  onClick={() => setWidgetMenuOpen((open) => !open)}
+                >
+                  <SlidersHorizontal size={16} />
+                  Customize widgets
+                  <ChevronDown size={15} />
+                </button>
+                {widgetMenuOpen && (
+                  <div
+                    className="widget-customizer-menu"
+                    id="dashboard-widget-options"
+                    aria-label="Dashboard widgets"
+                  >
+                    <strong>Show on dashboard</strong>
+                    {widgetOptions.map(({ key, label }) => (
+                      <label key={key}>
+                        <input
+                          type="checkbox"
+                          checked={dashboardWidgets[key]}
+                          onChange={(event) =>
+                            updateDashboardWidget(key, event.target.checked)
+                          }
+                        />
+                        <span>{label}</span>
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <section className="dashboard-filter-bar" aria-label="Dashboard date range">
+              <div className="dashboard-filter-heading">
+                <CalendarDays size={18} />
+                <div>
+                  <strong>Activity period</strong>
+                  <span>
+                    {dateRange.valid
+                      ? `${new Date(`${dateRange.start}T00:00:00`).toLocaleDateString(
+                          "en-US",
+                          { month: "short", day: "numeric", year: "numeric" },
+                        )} – ${new Date(`${dateRange.end}T00:00:00`).toLocaleDateString(
+                          "en-US",
+                          { month: "short", day: "numeric", year: "numeric" },
+                        )}`
+                      : "Choose a valid date range"}
+                  </span>
+                </div>
+              </div>
+              <div className="dashboard-date-controls">
+                <div className="dashboard-range-options" aria-label="Quick date ranges">
+                  {(
+                    [
+                      ["30d", "30 days"],
+                      ["90d", "90 days"],
+                      ["6m", "6 months"],
+                      ["12m", "12 months"],
+                      ["custom", "Custom"],
+                    ] as const
+                  ).map(([range, label]) => (
+                    <button
+                      type="button"
+                      key={range}
+                      className={`dashboard-range-button ${
+                        dashboardRange === range ? "active" : ""
+                      }`}
+                      aria-pressed={dashboardRange === range}
+                      onClick={() => setDashboardRange(range)}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+                {dashboardRange === "custom" && (
+                  <div className="dashboard-custom-dates">
+                    <label>
+                      <span>From</span>
+                      <input
+                        type="date"
+                        value={customStartDate}
+                        max={customEndDate}
+                        onChange={(event) => setCustomStartDate(event.target.value)}
+                      />
+                    </label>
+                    <label>
+                      <span>To</span>
+                      <input
+                        type="date"
+                        value={customEndDate}
+                        min={customStartDate}
+                        max={toDateInputValue(new Date())}
+                        onChange={(event) => setCustomEndDate(event.target.value)}
+                      />
+                    </label>
+                  </div>
+                )}
+              </div>
+            </section>
+
+            {(dashboardWidgets.balance ||
+              dashboardWidgets.income ||
+              dashboardWidgets.spending) && (
+              <div className="balance-grid">
+                {dashboardWidgets.balance && (
+                  <section className="balance-card">
+                    <div className="balance-card-top">
+                      <span className="balance-label">Total account balance</span>
+                      <button
+                        type="button"
+                        className="balance-visibility"
+                        onClick={() => setShowBalance((current) => !current)}
+                        aria-label={
+                          showBalance ? "Hide account balances" : "Show account balances"
+                        }
+                      >
+                        {showBalance ? <Eye size={19} /> : <EyeOff size={19} />}
+                        <span>{showBalance ? "Hide balance" : "Show balance"}</span>
+                      </button>
+                    </div>
+
+                    {accountLoading ? (
+                      <p className="balance-amount" role="status">
+                        Loading...
+                      </p>
+                    ) : accountError ? (
+                      <div className="balance-error" role="alert">
+                        <p>{accountError}</p>
+                        <button
+                          type="button"
+                          className="balance-visibility"
+                          onClick={refreshPage}
+                        >
+                          Refresh page
+                        </button>
+                      </div>
+                    ) : (
+                      <p className="balance-amount">
+                        {showBalance
+                          ? formatMoney(Number(customerAccount?.balance ?? 0))
+                          : maskedBalance}
+                      </p>
+                    )}
+
+                    <div className="balance-card-footer">
+                      <span className="account-type-status">
+                        <span
+                          className={`account-status-indicator ${
+                            customerAccount ? "active" : "unavailable"
+                          }`}
+                          aria-hidden="true"
+                        />
+                        {customerAccount
+                          ? `${customerAccount.account_type} · Active`
+                          : accountLoading
+                            ? "Checking account status"
+                            : "Account unavailable"}
+                      </span>
+                      <span className="balance-card-account-number">
+                        {customerAccount?.account_number
+                          ? `•••• ${customerAccount.account_number.slice(-4)}`
+                          : "Number unavailable"}
+                        {customerAccount?.account_number && (
+                          <button
+                            type="button"
+                            className="account-copy-button account-copy-button-light"
+                            aria-label="Copy full account number"
+                            title="Copy account number"
+                            onClick={handleCopyAccountNumber}
+                          >
+                            <Copy size={14} />
+                          </button>
+                        )}
+                      </span>
+                    </div>
+                  </section>
+                )}
+
+                {dashboardWidgets.income && (
+                  <section className="summary-card">
+                    <div className="summary-card-top">
+                      <div className="summary-icon income-icon">
+                        <ArrowDownLeft size={20} />
+                      </div>
+                      <span>Selected period</span>
+                    </div>
+                    <p className="summary-label">Money in</p>
+                    <h3>{showBalance ? formatMoney(monthlyIncome) : maskedBalance}</h3>
+                    <p className="summary-footnote">
+                      <span className="positive-text">Credits</span> · Completed transactions
+                    </p>
+                  </section>
+                )}
+
+                {dashboardWidgets.spending && (
+                  <section className="summary-card">
+                    <div className="summary-card-top">
+                      <div className="summary-icon spending-icon">
+                        <ArrowUpRight size={20} />
+                      </div>
+                      <span>Selected period</span>
+                    </div>
+                    <p className="summary-label">Money out</p>
+                    <h3>{showBalance ? formatMoney(monthlySpending) : maskedBalance}</h3>
+                    <p className="summary-footnote">
+                      Debits · Completed transactions
+                    </p>
+                  </section>
+                )}
+              </div>
+            )}
+
+            {(dashboardWidgets.cashflow || dashboardWidgets.balanceTrend) && (
+              <div className="analytics-grid">
+                {dashboardWidgets.cashflow && (
+                  <section className="panel analytics-panel">
+                    <div className="panel-header">
+                      <div>
+                        <h2>Income &amp; expenses</h2>
+                        <p>Monthly completed transactions in this period</p>
+                      </div>
+                      <div className="chart-legend" aria-label="Chart legend">
+                        <span><i className="legend-income" />Income</span>
+                        <span><i className="legend-expense" />Expenses</span>
+                      </div>
+                    </div>
+                    {dashboardCompletedTransactions.length === 0 ? (
+                      <div className="chart-empty-state">
+                        No completed transactions in this period yet.
+                      </div>
+                    ) : (
+                      <div className="chart-scroll">
+                        <svg
+                          className="cashflow-chart"
+                          viewBox="0 0 720 230"
+                          role="img"
+                          aria-label="Monthly income and expense comparison"
+                        >
+                          <line x1="42" y1="20" x2="704" y2="20" />
+                          <line x1="42" y1="60" x2="704" y2="60" />
+                          <line x1="42" y1="100" x2="704" y2="100" />
+                          <line x1="42" y1="140" x2="704" y2="140" />
+                          <line x1="42" y1="180" x2="704" y2="180" />
+                          {monthlyActivity.map((month, index) => {
+                            const slot = 662 / monthlyActivity.length;
+                            const center = 42 + slot * (index + 0.5);
+                            const barWidth = Math.min(20, slot * 0.32);
+                            const incomeHeight = (month.income / cashflowMax) * 145;
+                            const spendingHeight = (month.spending / cashflowMax) * 145;
+
+                            return (
+                              <g key={month.date.toISOString()}>
+                                <title>
+                                  {month.label}: income {formatMoney(month.income)}, expenses {formatMoney(month.spending)}
+                                </title>
+                                <rect
+                                  className="cashflow-income-bar"
+                                  x={center - barWidth - 2}
+                                  y={180 - incomeHeight}
+                                  width={barWidth}
+                                  height={incomeHeight}
+                                  rx="4"
+                                />
+                                <rect
+                                  className="cashflow-expense-bar"
+                                  x={center + 2}
+                                  y={180 - spendingHeight}
+                                  width={barWidth}
+                                  height={spendingHeight}
+                                  rx="4"
+                                />
+                                {(monthlyActivity.length <= 8 || index % 2 === 0) && (
+                                  <text x={center} y="207" textAnchor="middle">
+                                    {month.label}
+                                  </text>
+                                )}
+                              </g>
+                            );
+                          })}
+                        </svg>
+                      </div>
+                    )}
+                  </section>
+                )}
+
+                {dashboardWidgets.balanceTrend && (
+                  <section className="panel analytics-panel">
+                    <div className="panel-header">
+                      <div>
+                        <h2>Monthly balance trend</h2>
+                        <p>Estimated from your current balance and transaction history</p>
+                      </div>
+                      <TrendingUp size={19} className="analytics-heading-icon" />
+                    </div>
+                    {accountLoading ? (
+                      <div className="chart-empty-state" role="status">
+                        Loading your balance history...
+                      </div>
+                    ) : accountError ? (
+                      <div className="chart-empty-state" role="alert">
+                        Balance history is unavailable until your account loads.
+                      </div>
+                    ) : monthlyActivity.length === 0 ? (
+                      <div className="chart-empty-state">
+                        Select a valid date range to see your balance trend.
+                      </div>
+                    ) : (
+                      <div className="chart-scroll">
+                        <svg
+                          className="balance-trend-chart"
+                          viewBox="0 0 720 230"
+                          role="img"
+                          aria-label="Estimated monthly account balance trend"
+                        >
+                          <line x1="42" y1="20" x2="704" y2="20" />
+                          <line x1="42" y1="60" x2="704" y2="60" />
+                          <line x1="42" y1="100" x2="704" y2="100" />
+                          <line x1="42" y1="140" x2="704" y2="140" />
+                          <line x1="42" y1="180" x2="704" y2="180" />
+                          {monthlyActivity.length > 1 && (
+                            <polyline
+                              className="balance-trend-line"
+                              points={monthlyActivity
+                                .map((month, index) => {
+                                  const x =
+                                    42 + (662 / (monthlyActivity.length - 1)) * index;
+                                  const y =
+                                    180 -
+                                    ((month.balance - balanceMin) / balanceSpan) * 145;
+                                  return `${x},${y}`;
+                                })
+                                .join(" ")}
+                            />
+                          )}
+                          {monthlyActivity.map((month, index) => {
+                            const x =
+                              monthlyActivity.length === 1
+                                ? 373
+                                : 42 + (662 / (monthlyActivity.length - 1)) * index;
+                            const y =
+                              180 - ((month.balance - balanceMin) / balanceSpan) * 145;
+
+                            return (
+                              <g key={month.date.toISOString()}>
+                                <title>
+                                  {month.label}: estimated balance {formatMoney(month.balance)}
+                                </title>
+                                <circle
+                                  className="balance-trend-point"
+                                  cx={x}
+                                  cy={y}
+                                  r="5"
+                                />
+                                {(monthlyActivity.length <= 8 || index % 2 === 0) && (
+                                  <text x={x} y="207" textAnchor="middle">
+                                    {month.label}
+                                  </text>
+                                )}
+                              </g>
+                            );
+                          })}
+                        </svg>
+                      </div>
+                    )}
+                    <p className="chart-disclaimer">
+                      Historical balances are estimates based on the transactions available.
+                    </p>
+                  </section>
+                )}
+              </div>
+            )}
+
+            {(dashboardWidgets.categories ||
+              dashboardWidgets.account ||
+              dashboardWidgets.quickActions) && (
+              <div className="content-grid">
+                <div className="dashboard-side-column">
+                  {dashboardWidgets.categories && (
+                    <section className="panel spending-categories-panel">
+                      <div className="panel-header">
+                        <div>
+                          <h2>Spending categories</h2>
+                          <p>Completed debits · selected period</p>
+                        </div>
+                        <Activity size={19} className="analytics-heading-icon" />
+                      </div>
+                      {categoryTotals.length === 0 ? (
+                        <div className="empty-state">
+                          No completed spending to categorize in this period.
+                        </div>
+                      ) : (
+                        <div className="category-list">
+                          {categoryTotals.map((category) => (
+                            <div className="category-row" key={category.name}>
+                              <div className="category-row-heading">
+                                <span>
+                                  <i style={{ backgroundColor: category.color }} />
+                                  {category.name}
+                                </span>
+                                <strong>
+                                  {showBalance ? formatMoney(category.amount) : maskedBalance}
+                                </strong>
+                              </div>
+                              <div
+                                className="category-progress"
+                                role="progressbar"
+                                aria-label={`${category.name} share of spending`}
+                                aria-valuemin={0}
+                                aria-valuemax={100}
+                                aria-valuenow={Math.round(
+                                  (category.amount / monthlySpending) * 100,
+                                )}
+                              >
+                                <span
+                                  style={{
+                                    width: `${(category.amount / monthlySpending) * 100}%`,
+                                    backgroundColor: category.color,
+                                  }}
+                                />
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      <p className="category-disclaimer">
+                        Categories are estimated from transaction descriptions.
+                      </p>
+                    </section>
+                  )}
+
+                  {dashboardWidgets.account && (
+                    <section className="panel account-panel">
+                      <div className="panel-header">
+                        <div>
+                          <h2>My account</h2>
+                          <p>Your account information</p>
+                        </div>
+                        <span
+                          className={`account-status-badge ${
+                            customerAccount ? "active" : "unavailable"
+                          }`}
+                        >
+                          <span className="account-status-indicator" aria-hidden="true" />
+                          {customerAccount
+                            ? "Active"
+                            : accountLoading
+                              ? "Checking"
+                              : "Unavailable"}
+                        </span>
+                      </div>
+
+                      {accountLoading ? (
+                        <div role="status" className="empty-state">
+                          Loading account details...
+                        </div>
+                      ) : accountError ? (
+                        <div className="empty-state" role="alert">
+                          <p>{accountError}</p>
+                          <button
+                            type="button"
+                            className="text-button"
+                            onClick={refreshPage}
+                          >
+                            Refresh page
+                          </button>
+                        </div>
+                      ) : customerAccount ? (
+                        <>
+                          <div className="account-type-row">
+                            <div className="account-type-icon">
+                              <Wallet size={21} />
+                            </div>
+                            <div>
+                              <strong>{customerAccount.account_name}</strong>
+                              <span>
+                                {customerAccount.account_type} account · {customerAccount.currency}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="account-detail-row">
+                            <span>Account number</span>
+                            <span className="account-number-value">
+                              <strong>•••• {customerAccount.account_number.slice(-4)}</strong>
+                              <button
+                                type="button"
+                                className="account-copy-button"
+                                aria-label="Copy full account number"
+                                title="Copy account number"
+                                onClick={handleCopyAccountNumber}
+                              >
+                                <Copy size={15} />
+                              </button>
+                            </span>
+                          </div>
+                          <div className="account-detail-row">
+                            <span>Available balance</span>
+                            <strong>
+                              {showBalance
+                                ? formatMoney(Number(customerAccount.balance))
+                                : maskedBalance}
+                            </strong>
+                          </div>
+
+                          <button
+                            type="button"
+                            className="button-secondary full-width"
+                            onClick={() => navigate("Accounts")}
+                          >
+                            View account details
+                          </button>
+                        </>
+                      ) : (
+                        renderAccountError()
+                      )}
+                    </section>
+                  )}
+
+                  {dashboardWidgets.quickActions && (
+                    <section className="panel quick-actions-panel">
+                      <div className="panel-header">
+                        <div>
+                          <h2>Quick actions</h2>
+                          <p>Explore available sections</p>
+                        </div>
+                        <SlidersHorizontal size={19} />
+                      </div>
+
+                      <div className="quick-actions">
+                        <button
+                          type="button"
+                          className="quick-action"
+                          onClick={() => navigate("Accounts")}
+                        >
+                          <span className="quick-action-icon">
+                            <Landmark size={19} />
+                          </span>
+                          <span>Accounts</span>
+                          <ArrowUpRight size={16} />
+                        </button>
+
+                        <button
+                          type="button"
+                          className="quick-action"
+                          onClick={() => navigate("Transactions")}
+                        >
+                          <span className="quick-action-icon">
+                            <Activity size={19} />
+                          </span>
+                          <span>Transactions</span>
+                          <ArrowUpRight size={16} />
+                        </button>
+
+                        <button
+                          type="button"
+                          className="quick-action"
+                          onClick={() => navigate("My Profile")}
+                        >
+                          <span className="quick-action-icon">
+                            <UserRound size={19} />
+                          </span>
+                          <span>My profile</span>
+                          <ArrowUpRight size={16} />
+                        </button>
+
+                        <button
+                          type="button"
+                          className="quick-action"
+                          onClick={() => navigate("Transfers")}
+                        >
+                          <span className="quick-action-icon">
+                            <ArrowLeftRight size={19} />
+                          </span>
+                          <span>Transfers</span>
+                          <ArrowUpRight size={16} />
+                        </button>
+                      </div>
+                    </section>
+                  )}
+                </div>
+              </div>
+            )}
+          </section>
         )}
 
         {activePage === "Accounts" && (
