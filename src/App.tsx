@@ -44,6 +44,7 @@ import Auth from "./Auth";
 import InvestmentsPage from "./InvestmentsPage";
 import CryptoExchangePage, { type CompletedCryptoOrder } from "./CryptoExchangePage";
 import PaymentsPage, { type CompletedPayment } from "./PaymentsPage";
+import SettingsPanel from "./SettingsPanel";
 import { supabase } from "./lib/supabase";
 
 type DatabaseTransaction = {
@@ -98,6 +99,27 @@ function readSavedTransfers(userId: string): DatabaseTransaction[] {
       created_at: record.created_at,
     };
   });
+}
+
+async function readAllExportRows(
+  queryPage: (
+    start: number,
+    end: number,
+  ) => PromiseLike<{
+    data: unknown[] | null;
+    error: { message: string } | null;
+  }>,
+) {
+  const rows: unknown[] = [];
+
+  for (let start = 0; ; start += 1000) {
+    const { data, error } = await queryPage(start, start + 999);
+    if (error) throw new Error(error.message);
+
+    const page = data ?? [];
+    rows.push(...page);
+    if (page.length < 1000) return rows;
+  }
 }
 
 type CustomerAccount = {
@@ -361,6 +383,8 @@ function App() {
   const [supportMessage, setSupportMessage] = useState("");
   const [activePage, setActivePage] = useState<PageName>("Dashboard");
   const [theme, setTheme] = useState<ThemePreference>(readThemePreference);
+  const [compactDisplay, setCompactDisplay] = useState(false);
+  const sessionUserId = session?.user.id;
   const [failedProfileAvatarUrl, setFailedProfileAvatarUrl] = useState("");
   const [showBalance, setShowBalance] = useState(true);
   const [showCardDetails, setShowCardDetails] = useState(false);
@@ -562,6 +586,78 @@ function App() {
       cancelled = true;
     };
   }, [session]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadSavedSettings() {
+      if (!sessionUserId) return;
+
+      let result;
+      try {
+        result = await supabase
+          .from("user_settings")
+          .select("preferences")
+          .eq("user_id", sessionUserId)
+          .maybeSingle();
+      } catch (error) {
+        console.error("Unable to load saved application settings.", error);
+        return;
+      }
+
+      if (cancelled) return;
+      if (result.error) {
+        console.error("Unable to load saved application settings.", result.error);
+        return;
+      }
+
+      const preferences = result.data?.preferences;
+      if (!preferences || typeof preferences !== "object") return;
+
+      const appearance = (preferences as Record<string, unknown>).appearance;
+      if (appearance && typeof appearance === "object") {
+        const appearancePreferences = appearance as Record<string, unknown>;
+        if (
+          appearancePreferences.theme === "light" ||
+          appearancePreferences.theme === "dark"
+        ) {
+          setTheme(appearancePreferences.theme);
+          try {
+            localStorage.setItem("guardian-theme", appearancePreferences.theme);
+          } catch (storageError) {
+            console.error("Unable to cache the saved theme preference.", storageError);
+          }
+        }
+        if (typeof appearancePreferences.balanceVisibility === "boolean") {
+          setShowBalance(appearancePreferences.balanceVisibility);
+        }
+        if (typeof appearancePreferences.compactDisplay === "boolean") {
+          setCompactDisplay(appearancePreferences.compactDisplay);
+        }
+      }
+
+      const account = (preferences as Record<string, unknown>).account;
+      if (account && typeof account === "object") {
+        const defaultPage = (account as Record<string, unknown>)
+          .defaultDashboardPage;
+        if (
+          defaultPage === "Dashboard" ||
+          defaultPage === "Accounts" ||
+          defaultPage === "Transactions" ||
+          defaultPage === "Investments"
+        ) {
+          setActivePage((currentPage) =>
+            currentPage === "Dashboard" ? defaultPage : currentPage,
+          );
+        }
+      }
+    }
+
+    void loadSavedSettings();
+    return () => {
+      cancelled = true;
+    };
+  }, [sessionUserId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1495,6 +1591,106 @@ function App() {
     );
   }
 
+  async function handleExportAccountData() {
+    if (!session?.user) {
+      throw new Error("Please sign in before exporting your data.");
+    }
+
+    const userId = session.user.id;
+    const [
+      profileResult,
+      settingsResult,
+      accounts,
+      transactions,
+      payments,
+      cryptoOrders,
+      investments,
+      investmentGoals,
+      paymentBeneficiaries,
+      notifications,
+      supportTicketsExport,
+    ] = await Promise.all([
+      supabase.from("profiles").select("*").eq("id", userId).maybeSingle(),
+      supabase.from("user_settings").select("preferences, updated_at").eq("user_id", userId).maybeSingle(),
+      readAllExportRows((start, end) =>
+        supabase.from("accounts").select("*").eq("user_id", userId).range(start, end),
+      ),
+      readAllExportRows((start, end) =>
+        supabase.from("transactions").select("*").eq("user_id", userId).order("created_at", { ascending: false }).range(start, end),
+      ),
+      readAllExportRows((start, end) =>
+        supabase.from("payments").select("*").eq("user_id", userId).order("created_at", { ascending: false }).range(start, end),
+      ),
+      readAllExportRows((start, end) =>
+        supabase.from("crypto_orders").select("*").eq("user_id", userId).order("created_at", { ascending: false }).range(start, end),
+      ),
+      readAllExportRows((start, end) =>
+        supabase.from("investments").select("*").eq("user_id", userId).order("created_at", { ascending: false }).range(start, end),
+      ),
+      readAllExportRows((start, end) =>
+        supabase.from("investment_goals").select("*").eq("user_id", userId).order("created_at", { ascending: false }).range(start, end),
+      ),
+      readAllExportRows((start, end) =>
+        supabase.from("payment_beneficiaries").select("*").eq("user_id", userId).order("created_at", { ascending: false }).range(start, end),
+      ),
+      readAllExportRows((start, end) =>
+        supabase.from("user_notifications").select("*").eq("user_id", userId).order("created_at", { ascending: false }).range(start, end),
+      ),
+      readAllExportRows((start, end) =>
+        supabase.from("support_tickets").select("*").eq("user_id", userId).order("created_at", { ascending: false }).range(start, end),
+      ),
+    ]);
+    const failedResult = [profileResult, settingsResult].find(
+      (result) => result.error,
+    );
+    if (failedResult?.error) {
+      console.error("An account data export query failed.", failedResult.error);
+      throw new Error("Some of your account data could not be exported. Please try again or contact Support.");
+    }
+
+    let localTransfers: DatabaseTransaction[];
+    try {
+      localTransfers = readSavedTransfers(userId);
+    } catch (error) {
+      console.error("Unable to include saved transfer data in the export.", error);
+      throw new Error(
+        "Your locally saved transfer data could not be exported. Please contact Support.",
+        { cause: error },
+      );
+    }
+
+    const exportContent = {
+      exportedAt: new Date().toISOString(),
+      account: {
+        userId,
+        email: session.user.email ?? null,
+        profile: profileResult.data,
+        settings: settingsResult.data,
+      },
+      accounts,
+      transactions,
+      payments,
+      cryptoOrders,
+      investments,
+      investmentGoals,
+      paymentBeneficiaries,
+      notifications,
+      supportTickets: supportTicketsExport,
+      locallySavedTransfers: localTransfers,
+    };
+    const file = new Blob([JSON.stringify(exportContent, null, 2)], {
+      type: "application/json",
+    });
+    const fileUrl = URL.createObjectURL(file);
+    const link = document.createElement("a");
+    link.href = fileUrl;
+    link.download = `guardian-account-export-${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.append(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(fileUrl);
+  }
+
   async function handleSignOut() {
     const { error } = await supabase.auth.signOut();
 
@@ -1856,7 +2052,11 @@ function App() {
       ? avatarCandidate
       : "";
   return (
-    <div className="app-shell" data-theme={theme}>
+    <div
+      className="app-shell"
+      data-theme={theme}
+      data-compact={compactDisplay ? "true" : "false"}
+    >
       {menuOpen && (
         <button
           type="button"
@@ -3132,7 +3332,7 @@ function App() {
           )}
         </dialog>
 
-        {(activePage === "My Profile" || activePage === "Settings") && (
+        {activePage === "My Profile" && (
           <section className="page-content">
             <section className="panel profile-panel">
               <div className="panel-header">
@@ -3197,19 +3397,23 @@ function App() {
               </form>
             </section>
 
-            <section className="panel security-panel">
-              <div className="security-note">
-                <LockKeyhole size={22} />
-                <div>
-                  <strong>Account security</strong>
-                  <span>
-                    Your sign-in is handled by Supabase authentication.
-                  </span>
-                </div>
-                <CheckCircle2 size={19} />
-              </div>
-            </section>
           </section>
+        )}
+
+        {activePage === "Settings" && session?.user && (
+          <SettingsPanel
+            userId={session.user.id}
+            email={email}
+            profileName={profileName}
+            currentTheme={theme}
+            currentBalanceVisibility={showBalance}
+            currentCompactDisplay={compactDisplay}
+            onThemeChange={setTheme}
+            onBalanceVisibilityChange={setShowBalance}
+            onCompactDisplayChange={setCompactDisplay}
+            onNavigate={navigate}
+            onExportData={handleExportAccountData}
+          />
         )}
 
         {activePage === "Transfers" && (
