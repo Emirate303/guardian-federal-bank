@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { FormEvent } from "react";
 import {
   CalendarDays,
@@ -15,6 +15,7 @@ import {
   X,
 } from "lucide-react";
 import { supabase } from "./lib/supabase";
+import { usePopup } from "./components/usePopup";
 import "./Investments.css";
 
 type InvestmentType =
@@ -212,7 +213,7 @@ export default function InvestmentsPage({
   const [calculatorAmount, setCalculatorAmount] = useState("1000");
   const [calculatorRate, setCalculatorRate] = useState("5");
   const [calculatorMonths, setCalculatorMonths] = useState("24");
-  const dialogRef = useRef<HTMLDialogElement>(null);
+  const { requestConfirmation, showLoading, showSuccess, showError } = usePopup();
 
   useEffect(() => {
     let cancelled = false;
@@ -255,12 +256,6 @@ export default function InvestmentsPage({
       cancelled = true;
     };
   }, [userId, loadVersion]);
-
-  useEffect(() => {
-    const dialog = dialogRef.current;
-    if (modal && dialog && !dialog.open) dialog.showModal();
-    if (!modal && dialog?.open) dialog.close();
-  }, [modal]);
 
   const activeInvestments = useMemo(
     () => investments.filter((investment) => investment.status === "active"),
@@ -392,6 +387,15 @@ export default function InvestmentsPage({
 
     setSaving(true);
     setActionError("");
+    const closeLoading = showLoading({
+      title: "Adding investment",
+      message: "Creating a new portfolio entry.",
+      details: [
+        { label: "Product", value: modal.product.name },
+        { label: "Amount", value: dollars(principal, currency) },
+        { label: "Duration", value: `${duration} months` },
+      ],
+    });
     const { data, error } = await supabase
       .from("investments")
       .insert({
@@ -402,16 +406,35 @@ export default function InvestmentsPage({
       })
       .select("id, user_id, product_id, principal, duration_months, status, created_at")
       .single();
+    closeLoading();
     setSaving(false);
 
     if (error) {
       console.error("Unable to save investment entry.", error);
       setActionError("We couldn't add this investment. Please try again.");
+      showError({
+        title: "Investment not added",
+        message: "We couldn't add this investment entry. Please try again.",
+        details: [
+          { label: "Product", value: modal.product.name },
+          { label: "Amount", value: dollars(principal, currency) },
+        ],
+      });
       return;
     }
     setInvestments((current) => [data as InvestmentRecord, ...current]);
     setModal(null);
     onNotice("Investment entry added to your portfolio.");
+    showSuccess({
+      title: "Investment added",
+      message: "This entry was recorded in your portfolio. No bank funds were moved.",
+      details: [
+        { label: "Product", value: modal.product.name },
+        { label: "Amount", value: dollars(principal, currency) },
+        { label: "Duration", value: `${duration} months` },
+        { label: "Illustrative return", value: `${modal.product.annualReturn}% annually` },
+      ],
+    });
   }
 
   async function handleSaveGoal(event: FormEvent<HTMLFormElement>) {
@@ -444,6 +467,11 @@ export default function InvestmentsPage({
 
     setSaving(true);
     setActionError("");
+    const closeLoading = showLoading({
+      title: modal.goal ? "Updating goal" : "Creating goal",
+      message: modal.goal ? "Saving your changes to this investment goal." : "Creating a new investment goal.",
+      details: [{ label: "Goal", value: goalDraft.name.trim() }],
+    });
     const values = {
       name: goalDraft.name.trim(),
       goal_type: goalDraft.goal_type,
@@ -466,11 +494,16 @@ export default function InvestmentsPage({
           .insert({ ...values, user_id: userId })
           .select("id, user_id, name, goal_type, target_amount, current_amount, target_date, created_at, updated_at")
           .single();
+    closeLoading();
     setSaving(false);
 
     if (result.error) {
       console.error("Unable to save investment goal.", result.error);
       setActionError("We couldn't save this goal. Please try again.");
+      showError({
+        title: modal.goal ? "Goal not updated" : "Goal not created",
+        message: "We couldn't save this goal. Please try again.",
+      });
       return;
     }
     const savedGoal = result.data as InvestmentGoal;
@@ -481,56 +514,124 @@ export default function InvestmentsPage({
     );
     setModal(null);
     onNotice(modal.goal ? "Investment goal updated." : "Investment goal created.");
+    showSuccess({
+      title: modal.goal ? "Goal updated" : "Goal created",
+      message: "Goal progress is for tracking only; no money was moved.",
+      details: [
+        { label: "Goal", value: savedGoal.name },
+        { label: "Target amount", value: dollars(Number(savedGoal.target_amount), currency) },
+        { label: "Current progress", value: dollars(Number(savedGoal.current_amount), currency) },
+        { label: "Target date", value: savedGoal.target_date ? formatDate(savedGoal.target_date) : "No target date" },
+      ],
+    });
   }
 
-  async function confirmModalAction() {
-    if (!modal) return;
+  async function confirmCloseInvestment(investment: InvestmentRecord) {
+    const product = products.find(({ id }) => id === investment.product_id);
+    const confirmed = await requestConfirmation({
+      variant: "confirm",
+      danger: true,
+      title: "Close investment?",
+      message: "Close this portfolio entry? This will not affect your bank account and cannot be reopened.",
+      details: [
+        { label: "Product", value: product?.name ?? investment.product_id },
+        { label: "Amount", value: dollars(Number(investment.principal), currency) },
+        { label: "Duration", value: `${investment.duration_months} months` },
+        { label: "Started", value: formatDate(investment.created_at.slice(0, 10)) },
+      ],
+      warning: "Closing an entry is irreversible in this app. History remains for your records.",
+      confirmLabel: "Close investment",
+    });
+    if (!confirmed) return;
+
     setSaving(true);
     setActionError("");
-
-    if (modal.kind === "close-investment") {
-      const { data, error } = await supabase
-        .from("investments")
-        .update({ status: "closed" })
-        .eq("id", modal.investment.id)
-        .eq("user_id", userId)
-        .eq("status", "active")
-        .select("id")
-        .maybeSingle();
-      setSaving(false);
-      if (error || !data) {
-        console.error("Unable to close investment entry.", error);
-        setActionError("We couldn't close this investment. Refresh and try again.");
-        return;
-      }
-      setInvestments((current) =>
-        current.map((item) =>
-          item.id === modal.investment.id ? { ...item, status: "closed" } : item,
-        ),
-      );
-      setModal(null);
-      onNotice("Investment entry closed. No bank funds were moved.");
+    const closeLoading = showLoading({
+      title: "Closing investment",
+      message: "Marking this portfolio entry as closed.",
+    });
+    const { data, error } = await supabase
+      .from("investments")
+      .update({ status: "closed" })
+      .eq("id", investment.id)
+      .eq("user_id", userId)
+      .eq("status", "active")
+      .select("id")
+      .maybeSingle();
+    closeLoading();
+    setSaving(false);
+    if (error || !data) {
+      console.error("Unable to close investment entry.", error);
+      setActionError("We couldn't close this investment. Refresh and try again.");
+      showError({
+        title: "Investment not closed",
+        message: "We couldn't close this investment entry. Refresh the page and try again.",
+      });
       return;
     }
+    setInvestments((current) =>
+      current.map((item) =>
+        item.id === investment.id ? { ...item, status: "closed" } : item,
+      ),
+    );
+    onNotice("Investment entry closed. No bank funds were moved.");
+    showSuccess({
+      title: "Investment closed",
+      message: "This entry was closed. No bank funds were moved.",
+      details: [
+        { label: "Product", value: product?.name ?? investment.product_id },
+        { label: "Amount", value: dollars(Number(investment.principal), currency) },
+      ],
+    });
+  }
 
-    if (modal.kind === "delete-goal") {
-      const { data, error } = await supabase
-        .from("investment_goals")
-        .delete()
-        .eq("id", modal.goal.id)
-        .eq("user_id", userId)
-        .select("id")
-        .maybeSingle();
-      setSaving(false);
-      if (error || !data) {
-        console.error("Unable to delete investment goal.", error);
-        setActionError("We couldn't delete this goal. Please try again.");
-        return;
-      }
-      setGoals((current) => current.filter((goal) => goal.id !== modal.goal.id));
-      setModal(null);
-      onNotice("Investment goal deleted.");
+  async function confirmDeleteGoal(goal: InvestmentGoal) {
+    const confirmed = await requestConfirmation({
+      variant: "confirm",
+      danger: true,
+      title: "Delete goal?",
+      message: `Delete the “${goal.name}” goal? This can't be undone.`,
+      details: [
+        { label: "Goal", value: goal.name },
+        { label: "Type", value: goal.goal_type === "savings" ? "Savings goal" : "Investment goal" },
+        { label: "Target amount", value: dollars(Number(goal.target_amount), currency) },
+        { label: "Current progress", value: dollars(Number(goal.current_amount), currency) },
+      ],
+      warning: "Deleting a goal is permanent and cannot be undone.",
+      confirmLabel: "Delete goal",
+    });
+    if (!confirmed) return;
+
+    setSaving(true);
+    setActionError("");
+    const closeLoading = showLoading({
+      title: "Deleting goal",
+      message: "Removing this investment goal.",
+    });
+    const { data, error } = await supabase
+      .from("investment_goals")
+      .delete()
+      .eq("id", goal.id)
+      .eq("user_id", userId)
+      .select("id")
+      .maybeSingle();
+    closeLoading();
+    setSaving(false);
+    if (error || !data) {
+      console.error("Unable to delete investment goal.", error);
+      setActionError("We couldn't delete this goal. Please try again.");
+      showError({
+        title: "Goal not deleted",
+        message: "We couldn't delete this investment goal. Please try again.",
+      });
+      return;
     }
+    setGoals((current) => current.filter((item) => item.id !== goal.id));
+    onNotice("Investment goal deleted.");
+    showSuccess({
+      title: "Goal deleted",
+      message: `“${goal.name}” was removed from your goals.`,
+    });
   }
 
   function renderDialog() {
@@ -541,12 +642,11 @@ export default function InvestmentsPage({
 
     return (
       <dialog
-        ref={dialogRef}
         className="investment-dialog"
         aria-labelledby="investment-dialog-title"
         onClose={() => setModal(null)}
         onClick={(event) => {
-          if (event.target === event.currentTarget) dialogRef.current?.close();
+          if (event.target === event.currentTarget) event.currentTarget.close();
         }}
       >
         <div className="investment-dialog-header">
@@ -719,24 +819,6 @@ export default function InvestmentsPage({
           </form>
         )}
 
-        {!isAddInvestment && !isEditGoal && (
-          <div className="investment-form">
-            <p className="investment-dialog-intro">
-              {isCloseInvestment
-                ? "Close this portfolio entry? This will not affect your bank account."
-                : `Delete the “${modal.goal.name}” goal? This can't be undone.`}
-            </p>
-            {actionError && <p className="investment-form-error" role="alert">{actionError}</p>}
-            <div className="investment-dialog-actions">
-              <button type="button" className="investment-secondary-button" onClick={() => setModal(null)}>
-                Cancel
-              </button>
-              <button type="button" className="investment-danger-button" disabled={saving} onClick={() => void confirmModalAction()}>
-                {saving ? "Working..." : isCloseInvestment ? "Close investment" : "Delete goal"}
-              </button>
-            </div>
-          </div>
-        )}
       </dialog>
     );
   }
@@ -971,7 +1053,7 @@ export default function InvestmentsPage({
                           <td>{formatDate(investment.created_at)}</td>
                           <td>
                             {investment.status === "active" && (
-                              <button type="button" className="investment-text-action" onClick={() => setModal({ kind: "close-investment", investment })}>Close</button>
+                              <button type="button" className="investment-text-action" onClick={() => void confirmCloseInvestment(investment)}>Close</button>
                             )}
                           </td>
                         </tr>
@@ -1012,7 +1094,7 @@ export default function InvestmentsPage({
                         <div><strong>{goal.name}</strong><small>{goal.goal_type} goal</small></div>
                         <div className="investment-goal-actions">
                           <button type="button" aria-label={`Edit ${goal.name}`} onClick={() => openGoalEditor(goal)}><Pencil size={15} /></button>
-                          <button type="button" aria-label={`Delete ${goal.name}`} onClick={() => { setActionError(""); setModal({ kind: "delete-goal", goal }); }}><Trash2 size={15} /></button>
+                          <button type="button" aria-label={`Delete ${goal.name}`} onClick={() => void confirmDeleteGoal(goal)}><Trash2 size={15} /></button>
                         </div>
                       </div>
                       <div className="investment-goal-amounts"><strong>{dollars(progress, currency)}</strong><span>of {dollars(target, currency)}</span></div>

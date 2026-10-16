@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { ChangeEvent, FormEvent } from "react";
 import { Camera, ImagePlus, Trash2 } from "lucide-react";
+import { usePopup } from "./components/usePopup";
 import { supabase } from "./lib/supabase";
 import ProfileAvatar from "./ProfileAvatar";
 
@@ -83,6 +84,7 @@ export default function ProfilePictureEditor({
   onSaved,
   onRemoved,
 }: ProfilePictureEditorProps) {
+  const popup = usePopup();
   const inputRef = useRef<HTMLInputElement>(null);
   const previewUrlRef = useRef<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -225,7 +227,25 @@ export default function ProfilePictureEditor({
 
   async function removePicture() {
     if (!imagePath) return;
-    if (!window.confirm("Remove your profile picture? Your initials will be shown instead.")) return;
+
+    const confirmed = await popup.requestConfirmation({
+      variant: "confirm",
+      danger: true,
+      title: "Remove your profile picture?",
+      message: "Your saved picture will be deleted and your initials will be shown on your profile instead.",
+      details: [
+        { label: "Action", value: "Remove profile picture" },
+        { label: "Replaced by", value: "Your initials" },
+      ],
+      warning: "This can't be undone. You can always upload a new picture later.",
+      confirmLabel: "Remove picture",
+    });
+    if (!confirmed) return;
+
+    popup.showLoading({
+      title: "Removing your picture…",
+      message: "Please wait while we update your profile.",
+    });
 
     setBusy(true);
     setMessage("");

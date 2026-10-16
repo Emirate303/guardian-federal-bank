@@ -18,6 +18,7 @@ import {
   X,
 } from "lucide-react";
 import { supabase } from "./lib/supabase";
+import { usePopup } from "./components/usePopup";
 import "./Payments.css";
 
 export type PaymentCategory =
@@ -333,9 +334,8 @@ export default function PaymentsPage({
   const [paymentSearch, setPaymentSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [deleteTarget, setDeleteTarget] = useState<PaymentBeneficiary | null>(null);
-  const deleteDialogRef = useRef<HTMLDialogElement>(null);
   const idempotencyKeyRef = useRef<string | null>(null);
+  const { requestConfirmation, showLoading, showSuccess, showError } = usePopup();
 
   useEffect(() => {
     let cancelled = false;
@@ -375,12 +375,6 @@ export default function PaymentsPage({
       cancelled = true;
     };
   }, [userId, loadVersion]);
-
-  useEffect(() => {
-    const dialog = deleteDialogRef.current;
-    if (deleteTarget && dialog && !dialog.open) dialog.showModal();
-    if (!deleteTarget && dialog?.open) dialog.close();
-  }, [deleteTarget]);
 
   const matchingBeneficiaries = beneficiaries.filter(
     (beneficiary) => beneficiary.category === payment.category,
@@ -509,6 +503,15 @@ export default function PaymentsPage({
 
     setSaving(true);
     setFormError("");
+    const closeLoading = showLoading({
+      title: "Processing payment",
+      message: "Please wait while your payment is confirmed. Do not close or refresh this page.",
+      details: [
+        { label: "Payment", value: categoryLabel(payment.category) },
+        { label: "Provider", value: payment.provider },
+        { label: "Amount", value: formatMoney(Number(payment.amount), currency) },
+      ],
+    });
     const idempotencyKey = idempotencyKeyRef.current ?? crypto.randomUUID();
     idempotencyKeyRef.current = idempotencyKey;
     const { data, error: paymentError } = await supabase.rpc("submit_payment", {
@@ -520,22 +523,31 @@ export default function PaymentsPage({
       p_beneficiary_id: payment.beneficiaryId || null,
       p_idempotency_key: idempotencyKey,
     });
+    closeLoading();
     setSaving(false);
 
     if (paymentError || !data || typeof data !== "object") {
       console.error("Unable to submit payment.", paymentError);
       const message = paymentError?.message ?? "";
-      setFormError(
-        message.includes("INSUFFICIENT_FUNDS")
-          ? "Your account balance is too low for this payment."
-          : message.includes("ACCOUNT_NOT_FOUND")
-            ? "No eligible account was found for this profile."
-            : message.includes("INVALID_PAYMENT_BENEFICIARY")
-              ? "The selected beneficiary is no longer valid. Review the payment details and try again."
-              : message.includes("IDEMPOTENCY_KEY_REQUIRED")
-                ? "We couldn't create a secure payment reference. Please try confirming again."
-                : "We couldn't confirm this payment. Retry this confirmation to safely check its status, or review payment history before starting another payment.",
-      );
+      const explanation = message.includes("INSUFFICIENT_FUNDS")
+        ? "Your account balance is too low for this payment."
+        : message.includes("ACCOUNT_NOT_FOUND")
+          ? "No eligible account was found for this profile."
+          : message.includes("INVALID_PAYMENT_BENEFICIARY")
+            ? "The selected beneficiary is no longer valid. Review the payment details and try again."
+            : message.includes("IDEMPOTENCY_KEY_REQUIRED")
+              ? "We couldn't create a secure payment reference. Please try confirming again."
+              : "We couldn't confirm this payment. Retry this confirmation to safely check its status, or review payment history before starting another payment.";
+      setFormError(explanation);
+      showError({
+        title: "Payment not confirmed",
+        message: explanation,
+        details: [
+          { label: "Payment", value: categoryLabel(payment.category) },
+          { label: "Provider", value: payment.provider },
+          { label: "Amount", value: formatMoney(Number(payment.amount), currency) },
+        ],
+      });
       return;
     }
 
@@ -547,9 +559,9 @@ export default function PaymentsPage({
       !Number.isFinite(Number(completedPayment.balance_after))
     ) {
       console.error("Payment RPC returned an invalid receipt.", data);
-      setFormError(
-        "Payment may have completed, but its confirmation was invalid. Check payment history before retrying.",
-      );
+      const explanation = "Payment may have completed, but its confirmation was invalid. Check payment history before retrying.";
+      setFormError(explanation);
+      showError({ title: "Payment confirmation incomplete", message: explanation });
       return;
     }
 
@@ -560,6 +572,19 @@ export default function PaymentsPage({
     setStep("form");
     onPaymentComplete(completedPayment);
     onNotice(`Payment completed. Reference ${completedPayment.reference}.`);
+    showSuccess({
+      title: "Payment confirmed",
+      message: "This confirms an in-app balance update only. No external bill or service was paid.",
+      details: [
+        { label: "Reference", value: completedPayment.reference },
+        { label: "Payment", value: `${categoryLabel(completedPayment.category)} · ${completedPayment.provider}` },
+        { label: "Recipient", value: completedPayment.recipient },
+        ...(completedPayment.plan ? [{ label: "Plan", value: completedPayment.plan }] : []),
+        { label: "Amount", value: formatMoney(Number(completedPayment.amount), currency) },
+        { label: "Date", value: formatDate(completedPayment.created_at) },
+        { label: "Balance after", value: formatMoney(Number(completedPayment.balance_after), currency) },
+      ],
+    });
   }
 
   async function saveBeneficiary(event: FormEvent<HTMLFormElement>) {
@@ -586,6 +611,15 @@ export default function PaymentsPage({
     }
 
     setSaving(true);
+    const closeLoading = showLoading({
+      title: "Saving beneficiary",
+      message: "Adding this beneficiary to your saved payment details.",
+      details: [
+        { label: "Name", value: name },
+        { label: "Payment type", value: categoryLabel(beneficiaryDraft.category) },
+        { label: "Provider", value: provider },
+      ],
+    });
     const { data, error } = await supabase
       .from("payment_beneficiaries")
       .insert({
@@ -597,49 +631,85 @@ export default function PaymentsPage({
       })
       .select("id, user_id, display_name, category, provider, recipient, created_at")
       .single();
+    closeLoading();
     setSaving(false);
     if (error) {
       console.error("Unable to save payment beneficiary.", error);
-      setBeneficiaryError(
+      const explanation =
         error.code === "23505"
           ? "This beneficiary is already saved."
-          : "We couldn't save this beneficiary. Please try again.",
-      );
+          : "We couldn't save this beneficiary. Please try again.";
+      setBeneficiaryError(explanation);
+      showError({ title: "Beneficiary not saved", message: explanation });
       return;
     }
     setBeneficiaries((current) => [data as PaymentBeneficiary, ...current]);
     setBeneficiaryDraft(initialBeneficiaryDraft);
     onNotice("Beneficiary saved.");
+    showSuccess({
+      title: "Beneficiary saved",
+      message: `${name} was added to your saved payment beneficiaries.`,
+      details: [
+        { label: "Name", value: name },
+        { label: "Payment type", value: categoryLabel(beneficiaryDraft.category) },
+        { label: "Provider", value: provider },
+        { label: "Account or number", value: recipient },
+      ],
+    });
     onActivityNotification(
       "Beneficiary saved",
       `${name} was added to your saved payment beneficiaries.`,
     );
   }
 
-  async function deleteBeneficiary() {
-    if (!deleteTarget) return;
+  async function deleteBeneficiary(target: PaymentBeneficiary) {
+    const confirmed = await requestConfirmation({
+      variant: "confirm",
+      danger: true,
+      title: "Delete beneficiary?",
+      message: "Remove this beneficiary from your saved payment details? Existing payment history will remain.",
+      details: [
+        { label: "Name", value: target.display_name },
+        { label: "Payment type", value: categoryLabel(target.category) },
+        { label: "Provider", value: target.provider },
+        { label: "Account or number", value: target.recipient },
+      ],
+      warning: "This action is irreversible. You will need to re-enter the details if you want to use this beneficiary again.",
+      confirmLabel: "Delete beneficiary",
+    });
+    if (!confirmed) return;
+
     setSaving(true);
+    const closeLoading = showLoading({
+      title: "Deleting beneficiary",
+      message: "Removing this beneficiary from your saved payment details.",
+    });
     const { data, error } = await supabase
       .from("payment_beneficiaries")
       .delete()
-      .eq("id", deleteTarget.id)
+      .eq("id", target.id)
       .eq("user_id", userId)
       .select("id")
       .maybeSingle();
+    closeLoading();
     setSaving(false);
     if (error || !data) {
       console.error("Unable to delete payment beneficiary.", error);
-      setBeneficiaryError("We couldn't delete this beneficiary. Please try again.");
-      setDeleteTarget(null);
+      const explanation = "We couldn't delete this beneficiary. Please try again.";
+      setBeneficiaryError(explanation);
+      showError({ title: "Beneficiary not deleted", message: explanation });
       return;
     }
-    const beneficiaryName = deleteTarget.display_name;
-    setBeneficiaries((current) => current.filter(({ id }) => id !== deleteTarget.id));
-    if (payment.beneficiaryId === deleteTarget.id) {
+    const beneficiaryName = target.display_name;
+    setBeneficiaries((current) => current.filter(({ id }) => id !== target.id));
+    if (payment.beneficiaryId === target.id) {
       setPayment((current) => ({ ...current, beneficiaryId: "" }));
     }
-    setDeleteTarget(null);
     onNotice("Beneficiary deleted.");
+    showSuccess({
+      title: "Beneficiary deleted",
+      message: `${beneficiaryName} was removed from your saved payment beneficiaries.`,
+    });
     onActivityNotification(
       "Beneficiary deleted",
       `${beneficiaryName} was removed from your saved payment beneficiaries.`,
@@ -892,7 +962,7 @@ export default function PaymentsPage({
                   <li key={item.id}>
                     <span className="payments-category-icon">{categoryIcon(item.category)}</span>
                     <div><strong>{item.display_name}</strong><small>{categoryLabel(item.category)} · {item.provider}</small><small>{item.recipient}</small></div>
-                    <button type="button" className="payments-delete-button" aria-label={`Delete ${item.display_name}`} onClick={() => setDeleteTarget(item)}><Trash2 size={16} /></button>
+                    <button type="button" className="payments-delete-button" aria-label={`Delete ${item.display_name}`} onClick={() => void deleteBeneficiary(item)}><Trash2 size={16} /></button>
                   </li>
                 ))}
               </ul>
@@ -941,26 +1011,6 @@ export default function PaymentsPage({
         </>
       )}
 
-      <dialog
-        className="payments-delete-dialog"
-        ref={deleteDialogRef}
-        aria-labelledby="payments-delete-title"
-        onClose={() => setDeleteTarget(null)}
-        onClick={(event) => {
-          if (event.target === event.currentTarget) deleteDialogRef.current?.close();
-        }}
-      >
-        {deleteTarget && (
-          <>
-            <h2 id="payments-delete-title">Delete beneficiary?</h2>
-            <p>Remove “{deleteTarget.display_name}” from your saved beneficiaries? Existing payment history will remain.</p>
-            <div className="payments-review-actions">
-              <button type="button" className="payments-secondary-button" disabled={saving} onClick={() => setDeleteTarget(null)}>Cancel</button>
-              <button type="button" className="payments-danger-button" disabled={saving} onClick={() => void deleteBeneficiary()}>{saving ? "Deleting..." : "Delete beneficiary"}</button>
-            </div>
-          </>
-        )}
-      </dialog>
     </section>
   );
 }

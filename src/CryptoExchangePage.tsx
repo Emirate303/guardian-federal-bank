@@ -18,6 +18,7 @@ import {
   X,
 } from "lucide-react";
 import { supabase } from "./lib/supabase";
+import { usePopup } from "./components/usePopup";
 import "./CryptoExchange.css";
 
 type Side = "buy" | "sell";
@@ -324,6 +325,7 @@ export default function CryptoExchangePage({
   const [submitting, setSubmitting] = useState(false);
   const [pendingOrder, setPendingOrder] = useState<PendingOrder | null>(null);
   const [watchlistBusy, setWatchlistBusy] = useState(false);
+  const { requestConfirmation, showLoading, showSuccess, showError } = usePopup();
   const usdAccount = accountCurrency.toUpperCase() === "USD";
 
   const fetchMarket = useCallback(async (signal?: AbortSignal) => {
@@ -571,9 +573,35 @@ export default function CryptoExchangePage({
 
   async function submitOrder() {
     if (!pendingOrder) return;
+    const assetName = pendingOrder.name;
+    const sideLabel = pendingOrder.side === "buy" ? "Buy" : "Sell";
+    const confirmed = await requestConfirmation({
+      variant: "confirm",
+      title: `Confirm ${sideLabel.toLowerCase()} order`,
+      message: "Review the estimated order details below before confirming. Market prices refresh at execution and you will be asked to reconfirm if the total changes.",
+      details: [
+        { label: "Order", value: `${sideLabel} ${assetName} (${pendingOrder.symbol.toUpperCase()})` },
+        { label: "Quantity", value: `${formatQuantity(pendingOrder.quantity)} ${pendingOrder.symbol.toUpperCase()}` },
+        { label: "Estimated price", value: formatUsd(pendingOrder.price) },
+        { label: "Estimated fee", value: formatUsd(pendingFee) },
+        { label: pendingOrder.side === "buy" ? "Estimated debit" : "Estimated credit", value: formatUsd(pendingTotal) },
+        { label: "Reference", value: pendingOrder.reference.slice(0, 8).toUpperCase() },
+      ],
+      confirmLabel: `Confirm ${sideLabel.toLowerCase()} order`,
+    });
+    if (!confirmed) return;
+
     setSubmitting(true);
     setOrderError("");
     setOrderSuccess("");
+    const closeLoading = showLoading({
+      title: `Executing ${sideLabel.toLowerCase()} order`,
+      message: "Your order is being settled against your account. Please wait.",
+      details: [
+        { label: "Order", value: `${sideLabel} ${assetName} (${pendingOrder.symbol.toUpperCase()})` },
+        { label: "Quantity", value: `${formatQuantity(pendingOrder.quantity)} ${pendingOrder.symbol.toUpperCase()}` },
+      ],
+    });
     const { data, error } = await supabase.functions.invoke(
       "execute-crypto-order",
       {
@@ -587,11 +615,16 @@ export default function CryptoExchangePage({
       },
     );
     if (error) {
+      closeLoading();
       console.error("Unable to execute the crypto order.", error);
-      setOrderError(
+      const explanation =
         error.message ||
-          "Your order could not be completed. Please try again.",
-      );
+        "Your order could not be completed. Please try again.";
+      setOrderError(explanation);
+      showError({
+        title: "Order not completed",
+        message: explanation,
+      });
     } else {
       try {
         if (
@@ -602,6 +635,7 @@ export default function CryptoExchangePage({
           throw new Error("The order service returned an invalid response.");
         }
         if (data.status === "quote_changed") {
+          closeLoading();
           if (
             !("unit_price_usd" in data) ||
             !marketNumber(data.unit_price_usd) ||
@@ -621,24 +655,45 @@ export default function CryptoExchangePage({
           );
         } else if (data.status === "completed" && "order" in data) {
           const result = readOrders([data.order])[0];
-          if (!result) throw new Error("The order service returned no completed order.");
+          if (!result) {
+            closeLoading();
+            throw new Error("The order service returned an invalid response.");
+          }
           onOrderCompleted(result);
+          closeLoading();
           setOrderSuccess(
             `${pendingOrder.side === "buy" ? "Buy" : "Sell"} order completed. Reference: ${result.order_reference}. ${pendingOrder.side === "buy" ? `${formatUsd(Number(result.settlement_usd))} was debited from your account.` : `${formatUsd(Number(result.settlement_usd))} was credited to your account.`}`,
           );
+          showSuccess({
+            title: `${sideLabel} order completed`,
+            message: pendingOrder.side === "buy" ? "The purchase was settled from your account." : "The sale was credited to your account.",
+            details: [
+              { label: "Order", value: `${sideLabel} ${assetName} (${pendingOrder.symbol.toUpperCase()})` },
+              { label: "Quantity", value: `${formatQuantity(Number(result.quantity))} ${result.symbol.toUpperCase()}` },
+              { label: "Fee", value: formatUsd(Number(result.fee_usd)) },
+              { label: pendingOrder.side === "buy" ? "Debited" : "Credited", value: formatUsd(Number(result.settlement_usd)) },
+              { label: "Reference", value: result.order_reference },
+            ],
+          });
           setConfirming(false);
           setPendingOrder(null);
           await loadPrivateData();
         } else {
-          throw new Error("The order service returned an unknown order status.");
+          closeLoading();
+          throw new Error("The order service returned an unknown status.");
         }
       } catch (responseError) {
-        console.error("The crypto order response could not be processed.", responseError);
-        setOrderError(
+        closeLoading();
+        const explanation =
           responseError instanceof Error
             ? responseError.message
-            : "The order service returned an invalid response.",
-        );
+            : "The order service returned an invalid response.";
+        console.error("The crypto order response was invalid.", responseError);
+        setOrderError(explanation);
+        showError({
+          title: "Order response invalid",
+          message: explanation,
+        });
       }
     }
     setSubmitting(false);

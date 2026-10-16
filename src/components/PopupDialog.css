@@ -1,0 +1,301 @@
+/* =========================================================
+   Guardian Federal Bank — global popup / confirmation dialog
+   Navy (#0A192F / #0F233D), gold (#D4AF37 / #C5A059)
+   Centered modal on desktop, bottom sheet on mobile.
+   ========================================================= */
+
+:root {
+  --gfb-navy: #0a192f;
+  --gfb-navy-2: #0f233d;
+  --gfb-gold: #d4af37;
+  --gfb-gold-2: #c5a059;
+}
+
+.gfb-popup {
+  width: auto;
+  max-width: none;
+  height: auto;
+  max-height: none;
+  border: none;
+  padding: 0;
+  background: transparent;
+  color: var(--text, #192640);
+}
+
+.gfb-popup::backdrop {
+  background: rgb(10 25 47 / 62%);
+  backdrop-filter: blur(2px);
+}
+
+.gfb-popup-card {
+  width: min(460px, calc(100vw - 48px));
+  margin: auto;
+  max-height: min(88vh, 780px);
+  display: flex;
+  flex-direction: column;
+  background: var(--surface, #ffffff);
+  border-radius: 18px;
+  border: 1px solid var(--border, #e7eaf1);
+  box-shadow:
+    0 24px 60px rgb(10 25 47 / 24%),
+    0 4px 14px rgb(10 25 47 / 10%);
+  overflow: hidden;
+  animation: gfb-popup-in 220ms cubic-bezier(0.2, 0.9, 0.3, 1);
+}
+
+/* Accent bar across the top, colored by variant */
+.gfb-popup-card::before {
+  content: "";
+  display: block;
+  height: 4px;
+  flex: none;
+  background: var(--gfb-gold);
+}
+.gfb-popup.success .gfb-popup-card::before { background: var(--success, #16845b); }
+.gfb-popup.error .gfb-popup-card::before { background: var(--danger, #c54444); }
+.gfb-popup.warning .gfb-popup-card::before { background: var(--warning, #a77518); }
+.gfb-popup.information .gfb-popup-card::before { background: var(--navy-light, #20365d); }
+.gfb-popup.loading .gfb-popup-card::before { background: var(--gfb-gold-2); }
+.gfb-popup.confirm.danger .gfb-popup-card::before { background: var(--danger, #c54444); }
+
+/* ---------- Header ---------- */
+
+.gfb-popup-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 20px 20px 0;
+}
+
+.gfb-popup-icon {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  background: rgb(212 175 55 / 14%);
+  color: var(--gfb-gold-2);
+}
+.gfb-popup.success .gfb-popup-icon { background: var(--success-bg, #e8f45b); color: var(--success, #16845b); background: #e8f5ee; }
+.gfb-popup.error .gfb-popup-icon { background: var(--danger-bg, #fff0f0); color: var(--danger, #c54444); }
+.gfb-popup.warning .gfb-popup-icon { background: var(--warning-bg, #fdf3e0); color: var(--warning, #a77518); }
+.gfb-popup.information .gfb-popup-icon { background: #e8eef8; color: var(--navy-light, #20365d); }
+.gfb-popup.loading .gfb-popup-icon { background: rgb(212 175 55 / 14%); color: var(--gfb-gold-2); }
+.gfb-popup.loading .gfb-popup-icon svg { animation: gfb-popup-spin 900ms linear infinite; }
+
+.gfb-popup-heading {
+  flex: 1;
+  min-width: 0;
+}
+
+.gfb-popup-heading h2 {
+  margin: 2px 0 4px;
+  font-size: 1.12rem;
+  line-height: 1.3;
+  color: var(--navy, #142344);
+  overflow-wrap: anywhere;
+}
+
+.gfb-popup-message {
+  margin: 0;
+  color: var(--muted, #778198);
+  font-size: 0.92rem;
+  overflow-wrap: anywhere;
+}
+
+.gfb-popup-close {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  margin: -6px -8px 0 0;
+  display: grid;
+  place-items: center;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--muted, #778198);
+  cursor: pointer;
+}
+.gfb-popup-close:hover { background: var(--page-bg, #f5f7fb); color: var(--navy, #142344); }
+
+/* ---------- Warning strip ---------- */
+
+.gfb-popup-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 14px 20px 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--warning-bg, #fdf3e0);
+  border: 1px solid rgb(167 117 24 / 25%);
+  color: var(--warning, #a77518);
+  font-size: 0.86rem;
+  line-height: 1.45;
+}
+.gfb-popup-warning svg { flex: none; margin-top: 1px; }
+.gfb-popup.error .gfb-popup-warning {
+  background: var(--danger-bg, #fff0f0);
+  border-color: rgb(197 68 68 / 25%);
+  color: var(--danger, #c54444);
+}
+
+/* ---------- Details list ---------- */
+
+.gfb-popup-details {
+  margin: 14px 20px 0;
+  padding: 4px 0;
+  border-top: 1px solid var(--border, #e7eaf1);
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.gfb-popup-details > div {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 14px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border, #e7eaf1);
+}
+.gfb-popup-details > div:last-child { border-bottom: none; }
+
+.gfb-popup-details dt {
+  color: var(--muted, #778198);
+  font-size: 0.84rem;
+  flex: none;
+}
+
+.gfb-popup-details dd {
+  margin: 0;
+  font-weight: 600;
+  color: var(--navy, #142344);
+  text-align: right;
+  overflow-wrap: anywhere;
+  font-size: 0.92rem;
+}
+
+/* ---------- Loading note ---------- */
+
+.gfb-popup-loading-note {
+  margin: 14px 20px 0;
+  color: var(--muted, #778198);
+  font-size: 0.86rem;
+}
+
+/* ---------- Actions ---------- */
+
+.gfb-popup-actions {
+  display: flex;
+  gap: 10px;
+  padding: 18px 20px calc(20px + env(safe-area-inset-bottom, 0px));
+  flex: none;
+}
+
+.gfb-popup-primary,
+.gfb-popup-secondary {
+  min-height: 44px;
+  padding: 0 18px;
+  border-radius: 12px;
+  font-weight: 600;
+  font-size: 0.94rem;
+  cursor: pointer;
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.gfb-popup-primary {
+  border: none;
+  background: linear-gradient(135deg, var(--gfb-gold), var(--gfb-gold-2));
+  color: var(--gfb-navy);
+  box-shadow: 0 6px 16px rgb(212 175 55 / 30%);
+}
+.gfb-popup-primary:hover { filter: brightness(1.05); }
+.gfb-popup-primary.danger {
+  background: var(--danger, #c54444);
+  color: #fff;
+  box-shadow: 0 6px 16px rgb(197 68 68 / 28%);
+}
+.gfb-popup-primary.danger:hover { background: #b23c3c; }
+
+.gfb-popup-secondary {
+  border: 1px solid var(--border, #e7eaf1);
+  background: var(--surface, #ffffff);
+  color: var(--navy, #142344);
+}
+.gfb-popup-secondary:hover { background: var(--page-bg, #f5f7fb); }
+
+/* ---------- Mobile: bottom sheet ---------- */
+
+@media (max-width: 640px) {
+  .gfb-popup,
+  .gfb-popup::backdrop {
+    /* dialog centers automatically; bottom-sheet alignment handled below */
+  }
+
+  .gfb-popup-card {
+    width: 100vw;
+    max-width: 100vw;
+    max-height: 92dvh;
+    margin: auto 0 0 0;
+    border-radius: 18px 18px 0 0;
+    border-left: none;
+    border-right: none;
+    border-bottom: none;
+    animation: gfb-sheet-in 240ms cubic-bezier(0.2, 0.9, 0.3, 1);
+  }
+
+  .gfb-popup-header { padding: 18px 16px 0; }
+  .gfb-popup-warning,
+  .gfb-popup-details,
+  .gfb-popup-loading-note { margin-left: 16px; margin-right: 16px; }
+
+  .gfb-popup-actions {
+    padding: 14px 16px calc(14px + env(safe-area-inset-bottom, 0px));
+    flex-direction: column;
+  }
+
+  .gfb-popup-heading h2 { font-size: 1.05rem; }
+}
+
+/* ---------- Animations & reduced motion ---------- */
+
+@keyframes gfb-popup-in {
+  from { opacity: 0; transform: translateY(10px) scale(0.985); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes gfb-sheet-in {
+  from { transform: translateY(100%); }
+  to { transform: none; }
+}
+
+@keyframes gfb-popup-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gfb-popup-card,
+  .gfb-popup-icon svg {
+    animation: none;
+  }
+  .gfb-popup-primary,
+  .gfb-popup-secondary,
+  .gfb-popup-close {
+    transition: none;
+  }
+}
+
+/* ---------- Screen-reader-only helper ---------- */
+
+.gfb-popup-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}

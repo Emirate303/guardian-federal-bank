@@ -25,6 +25,7 @@ import {
   WalletCards,
 } from "lucide-react";
 import { supabase } from "./lib/supabase";
+import { usePopup } from "./components/usePopup";
 import ProfileAvatar from "./ProfileAvatar";
 
 type ThemePreference = "light" | "dark";
@@ -195,6 +196,7 @@ export default function SettingsPanel({
   onNavigate,
   onExportData,
 }: SettingsPanelProps) {
+  const popup = usePopup();
   const [savedPreferences, setSavedPreferences] =
     useState<UserPreferences>(defaultPreferences);
   const [draft, setDraft] = useState<UserPreferences>(defaultPreferences);
@@ -547,52 +549,69 @@ export default function SettingsPanel({
     }
   }
 
-  async function removeTotp(factorId: string) {
-    if (!window.confirm("Remove this authenticator factor? You may need to verify your account again.")) {
-      return;
-    }
+  function removeTotp(factorId: string) {
+    void popup.requestConfirmation({
+      variant: "confirm",
+      title: "Remove authenticator",
+      message: "This authenticator app will no longer be able to generate verification codes for your account.",
+      details: [{ label: "Action", value: "Remove two-factor authenticator" }],
+      confirmLabel: "Remove authenticator",
+      danger: true,
+      onConfirm: async () => {
+        setFactorLoading(true);
+        setFactorMessage("");
+        setFactorError("");
+        try {
+          const { error } = await supabase.auth.mfa.unenroll({ factorId });
+          if (error) {
+            console.error("Unable to remove authenticator factor.", error);
+            setFactorError(error.message);
+            return false;
+          }
 
-    setFactorLoading(true);
-    setFactorMessage("");
-    setFactorError("");
-    try {
-      const { error } = await supabase.auth.mfa.unenroll({ factorId });
-      if (error) {
-        console.error("Unable to remove authenticator factor.", error);
-        setFactorError(error.message);
-        return;
-      }
-
-      setFactors((current) => current.filter((factor) => factor.id !== factorId));
-      setFactorMessage("Authenticator factor removed.");
-    } catch (error) {
-      console.error("Unable to remove authenticator factor.", error);
-      setFactorError("Authenticator factor could not be removed. Please try again.");
-    } finally {
-      setFactorLoading(false);
-    }
+          setFactors((current) => current.filter((factor) => factor.id !== factorId));
+          setFactorMessage("Authenticator factor removed.");
+          return true;
+        } catch (error) {
+          console.error("Unable to remove authenticator factor.", error);
+          setFactorError("Authenticator factor could not be removed. Please try again.");
+          return false;
+        } finally {
+          setFactorLoading(false);
+        }
+      },
+    });
   }
 
-  async function signOutOtherSessions() {
-    if (!window.confirm("Sign out every other active session for your account?")) return;
-
-    setSessionBusy(true);
-    setSessionMessage("");
-    setSessionError("");
-    try {
-      const { error } = await supabase.auth.signOut({ scope: "others" });
-      if (error) {
-        console.error("Unable to sign out other sessions.", error);
-        setSessionError(error.message);
-        return;
-      }
-      setSessionMessage("All other active sessions have been signed out.");
-    } catch (error) {
-      console.error("Unable to sign out other sessions.", error);
-      setSessionError("Other sessions could not be signed out. Please try again.");
-    } finally {
-      setSessionBusy(false);
-    }
+  function signOutOtherSessions() {
+    void popup.requestConfirmation({
+      variant: "confirm",
+      title: "Sign out other sessions",
+      message: "Every other active session will be signed out. This device will stay signed in.",
+      confirmLabel: "Sign out all others",
+      danger: true,
+      onConfirm: async () => {
+        setSessionBusy(true);
+        setSessionMessage("");
+        setSessionError("");
+        try {
+          const { error } = await supabase.auth.signOut({ scope: "others" });
+          if (error) {
+            console.error("Unable to sign out other sessions.", error);
+            setSessionError(error.message);
+            return false;
+          }
+          setSessionMessage("All other active sessions have been signed out.");
+          return true;
+        } catch (error) {
+          console.error("Unable to sign out other sessions.", error);
+          setSessionError("Other sessions could not be signed out. Please try again.");
+          return false;
+        } finally {
+          setSessionBusy(false);
+        }
+      },
+    });
   }
 
   async function requestDeletion(event: FormEvent<HTMLFormElement>) {

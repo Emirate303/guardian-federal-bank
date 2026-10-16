@@ -48,6 +48,7 @@ import SettingsPanel from "./SettingsPanel";
 import ProfileAvatar from "./ProfileAvatar";
 import ProfilePictureEditor from "./ProfilePictureEditor";
 import { supabase } from "./lib/supabase";
+import { PopupProvider } from "./components/PopupDialog";
 
 type InstallPromptEvent = Event & {
   prompt: () => Promise<void>;
@@ -355,7 +356,7 @@ const navigation: {
   },
 ];
 
-function App() {
+function AppShell() {
   const [session, setSession] = useState<Session | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
 
@@ -2174,7 +2175,7 @@ function App() {
   className={`sidebar ${menuOpen ? "sidebar-open" : ""}`}
   aria-label="Main navigation"
 >
-        
+
 <div className="sidebar-brand">
   <div className="brand-mark">
     <Landmark size={25} />
@@ -2196,7 +2197,7 @@ function App() {
 </div>
 
 
-        
+
 <nav className="sidebar-nav" aria-label="Main navigation">
   {navigation.map((group) => (
     <div className="nav-group" key={group.label}>
@@ -2262,7 +2263,7 @@ function App() {
       <main className="main-content">
         <header className="topbar">
           <div className="topbar-left">
-           
+
 <button
   type="button"
   className={`icon-button mobile-menu-button ${
@@ -4445,4 +4446,11 @@ function App() {
   );
 }
 
-export default App;
+/** The exported root: wraps the app shell with the global popup provider. */
+export default function App() {
+  return (
+    <PopupProvider>
+      <AppShell />
+    </PopupProvider>
+  );
+}
