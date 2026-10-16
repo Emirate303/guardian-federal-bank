@@ -9,7 +9,6 @@ import {
   ArrowLeftRight,
   Home,
   ArrowUpRight,
-  ArrowDownToLine,
   Bell,
   CalendarDays,
   CheckCircle2,
@@ -25,7 +24,6 @@ import {
   Landmark,
   LockKeyhole,
   LogOut,
-  PiggyBank,
   Moon,
   Search,
   Send,
@@ -2545,7 +2543,7 @@ function AppShell() {
             {activePage !== "Dashboard" && (
               <p className="eyebrow">ONLINE BANKING</p>
             )}
-            <h1>{activePage}</h1>
+            <h1>{activePage === "Crypto Exchange" ? "Crypto" : activePage}</h1>
             <p className="page-subtitle">
               {activePage === "Dashboard"
                 ? "Here's what's happening with your account."
@@ -2743,16 +2741,16 @@ function AppShell() {
 
                   <button
                     type="button"
-                    className="quick-action quick-action-save"
-                    onClick={() => navigate("Accounts")}
+                    className="quick-action quick-action-crypto"
+                    onClick={() => navigate("Crypto Exchange")}
                   >
                     <span className="quick-action-icon">
-                      <PiggyBank size={20} />
+                      <Bitcoin size={20} />
                     </span>
                     <span className="quick-action-copy">
-                      <strong>Save</strong>
+                      <strong>Crypto</strong>
                     </span>
-                    <ArrowDownToLine className="quick-action-arrow" size={17} />
+                    <ArrowUpRight className="quick-action-arrow" size={17} />
                   </button>
                 </div>
               </section>

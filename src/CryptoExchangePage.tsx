@@ -887,7 +887,7 @@ export default function CryptoExchangePage({
         <aside className="crypto-trade-column">
           <section className="crypto-panel crypto-order-panel">
             <div className="crypto-panel-heading">
-              <div><span className="crypto-eyebrow">CRYPTO EXCHANGE</span><h2>Place an order</h2></div>
+              <div><span className="crypto-eyebrow">CRYPTO</span><h2>Place an order</h2></div>
             </div>
             <div className="crypto-side-tabs" role="tablist" aria-label="Order type">
               {(["buy", "sell"] as const).map((value) => (
