@@ -25,6 +25,7 @@ import {
   WalletCards,
 } from "lucide-react";
 import { supabase } from "./lib/supabase";
+import ProfileAvatar from "./ProfileAvatar";
 
 type ThemePreference = "light" | "dark";
 type SettingsSection =
@@ -136,6 +137,7 @@ type SettingsPanelProps = {
   userId: string;
   email: string;
   profileName: string;
+  profileAvatarUrl: string | null;
   currentTheme: ThemePreference;
   currentBalanceVisibility: boolean;
   currentCompactDisplay: boolean;
@@ -183,6 +185,7 @@ export default function SettingsPanel({
   userId,
   email,
   profileName,
+  profileAvatarUrl,
   currentTheme,
   currentBalanceVisibility,
   currentCompactDisplay,
@@ -257,7 +260,7 @@ export default function SettingsPanel({
 
       if (result.error) {
         console.error("Unable to load user settings.", result.error);
-        setSaveError("Your settings could not be loaded. You can retry by refreshing this page.");
+        setSaveError(`Your settings could not be loaded: ${result.error.message}. You can retry by refreshing this page.`);
       } else {
         const preferences = result.data?.preferences
           ? mergePreferences(result.data.preferences)
@@ -341,6 +344,21 @@ export default function SettingsPanel({
     setSaveError("");
   }
 
+  // Save preference edits automatically once changes stop for a moment.
+  useEffect(() => {
+    if (loading) return;
+    if (JSON.stringify(draft) === JSON.stringify(savedPreferences)) return;
+
+    const timer = window.setTimeout(() => {
+      void savePreferences();
+    }, 800);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draft, savedPreferences, loading]);
+
   async function savePreferences() {
     if (
       draft.financial.spendingAlerts &&
@@ -368,7 +386,13 @@ export default function SettingsPanel({
 
       if (error) {
         console.error("Unable to save user settings.", error);
-        setSaveError("Your changes could not be saved. Please try again.");
+        // Surface the real database reason (e.g. a missing table after a
+        // migration was never pushed) instead of a generic retry message.
+        setSaveError(
+          error.message.startsWith("Your changes could not be saved")
+            ? error.message
+            : `Your changes could not be saved: ${error.message}`,
+        );
         return;
       }
 
@@ -769,7 +793,7 @@ export default function SettingsPanel({
         return (
           <div className="settings-fields-grid">
             <div className="settings-profile-summary">
-              <span className="settings-icon-chip"><UserRound size={19} /></span>
+              <ProfileAvatar name={profileName || "Customer"} imageUrl={profileAvatarUrl} size="medium" />
               <div><strong>{profileName || "Customer"}</strong><small>{email}</small></div>
               <button type="button" className="settings-button text" onClick={() => onNavigate("My Profile")}>Edit profile <ChevronRight size={15} /></button>
             </div>
@@ -937,11 +961,13 @@ export default function SettingsPanel({
           )}
           <footer className="settings-panel-footer">
             <div aria-live="polite">
+              {saving && <p className="settings-feedback" role="status">Saving…</p>}
               {saveError && <p className="settings-feedback error" role="alert">{saveError}</p>}
-              {saveMessage && <p className="settings-feedback" role="status">{saveMessage}</p>}
+              {!saving && saveMessage && <p className="settings-feedback" role="status">{saveMessage}</p>}
             </div>
             {section !== "Security & Login" && section !== "Help & About" && section !== "Privacy & Data" && (
               <div className="settings-actions">
+                <span className="settings-autosave-note">Changes are saved automatically.</span>
                 <button type="button" className="settings-button text" onClick={cancelChanges} disabled={!isDirty || saving}>Cancel</button>
                 <button type="button" className="settings-button primary" onClick={() => void savePreferences()} disabled={saving || !isDirty || loading}>{saving ? "Saving…" : "Save changes"}</button>
               </div>

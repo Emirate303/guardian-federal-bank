@@ -1797,6 +1797,19 @@ h4 {
   border-color: #f0d0d0;
 }
 
+.profile-field-hint {
+  margin: 0;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.profile-save-message[role="status"][data-saving="true"] {
+  color: var(--muted);
+  background: transparent;
+  border-color: transparent;
+  padding-left: 0;
+}
+
 .notice.warning {
   color: var(--warning);
   background: var(--warning-bg);
@@ -6180,6 +6193,12 @@ h4 {
   gap: 8px;
 }
 
+.settings-autosave-note {
+  margin-right: 4px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
 .settings-panel-footer {
   display: flex;
   min-height: 68px;
@@ -6578,5 +6597,236 @@ h4 {
 
   .settings-account-badge {
     align-self: flex-start;
+  }
+}
+
+/* ---------- 32. Shared profile avatars and picture editor ---------- */
+
+.profile-avatar {
+  display: inline-flex;
+  flex: 0 0 42px;
+  width: 42px;
+  height: 42px;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  color: #0a192f;
+  background: #eee5d0;
+  border: 1px solid #e3d4af;
+  border-radius: 50%;
+  font-size: 13px;
+  font-weight: 750;
+  line-height: 1;
+}
+
+.profile-avatar img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.profile-avatar-small {
+  flex-basis: 34px;
+  width: 34px;
+  height: 34px;
+  font-size: 11px;
+}
+
+.profile-avatar-large {
+  flex-basis: 112px;
+  width: 112px;
+  height: 112px;
+  font-size: 28px;
+}
+
+.topbar-profile-avatar {
+  flex-shrink: 0;
+}
+
+.install-app-button {
+  min-height: 40px;
+  white-space: nowrap;
+}
+
+.sidebar-user-profile {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 3px;
+  color: #fff;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  border-radius: 9px;
+  cursor: pointer;
+}
+
+.sidebar-user-profile:hover {
+  background: rgb(255 255 255 / 6%);
+}
+
+.sidebar-user-profile > span:last-child {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sidebar-user-profile strong,
+.sidebar-user-profile small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sidebar-user-profile strong {
+  color: #fff;
+  font-size: 11px;
+}
+
+.sidebar-user-profile small {
+  color: #aab6ca;
+  font-size: 9px;
+}
+
+.profile-picture-panel {
+  margin-bottom: 20px;
+}
+
+.profile-picture-content {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 22px;
+}
+
+.profile-picture-preview {
+  display: grid;
+  flex: 0 0 120px;
+  width: 120px;
+  height: 120px;
+  place-items: center;
+  overflow: hidden;
+  background: #f7f3e6;
+  border: 1px solid #eee5ca;
+  border-radius: 50%;
+}
+
+.profile-picture-preview > img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+}
+
+.profile-picture-controls {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.profile-picture-controls > p {
+  max-width: 500px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.profile-picture-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 9px;
+}
+
+.profile-picture-actions button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+}
+
+.profile-picture-editor {
+  display: flex;
+  width: min(100%, 460px);
+  flex-direction: column;
+  gap: 12px;
+}
+
+.profile-picture-zoom {
+  display: grid;
+  grid-template-columns: auto minmax(100px, 1fr);
+  align-items: center;
+  gap: 12px;
+  color: #45556c;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.profile-picture-zoom input {
+  width: 100%;
+  accent-color: #c5a059;
+}
+
+.profile-picture-message,
+.profile-picture-saving {
+  margin: 0;
+  color: var(--success);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.profile-picture-message.error {
+  color: var(--danger);
+}
+
+.app-shell[data-theme="dark"] .profile-avatar {
+  color: #f0d58b;
+  background: #354054;
+  border-color: #75623b;
+}
+
+.app-shell[data-theme="dark"] .profile-picture-preview {
+  background: #243249;
+  border-color: #8d7131;
+}
+
+.app-shell[data-theme="dark"] .profile-picture-zoom {
+  color: #c8d2e0;
+}
+
+@media (max-width: 520px) {
+  .install-app-button {
+    min-height: 38px;
+    padding-inline: 9px;
+    font-size: 10px;
+  }
+
+  .profile-picture-content {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 15px;
+  }
+
+  .profile-picture-preview {
+    flex-basis: 96px;
+    width: 96px;
+    height: 96px;
+  }
+
+  .profile-picture-actions {
+    width: 100%;
+  }
+
+  .profile-picture-actions button {
+    flex: 1;
   }
 }

@@ -45,7 +45,14 @@ import InvestmentsPage from "./InvestmentsPage";
 import CryptoExchangePage, { type CompletedCryptoOrder } from "./CryptoExchangePage";
 import PaymentsPage, { type CompletedPayment } from "./PaymentsPage";
 import SettingsPanel from "./SettingsPanel";
+import ProfileAvatar from "./ProfileAvatar";
+import ProfilePictureEditor from "./ProfilePictureEditor";
 import { supabase } from "./lib/supabase";
+
+type InstallPromptEvent = Event & {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: "accepted" | "dismissed"; platform: string }>;
+};
 
 type DatabaseTransaction = {
   id: string;
@@ -353,6 +360,11 @@ function App() {
   const [authLoading, setAuthLoading] = useState(true);
 
   const [profileName, setProfileName] = useState("");
+  const [profileAvatarPath, setProfileAvatarPath] = useState<string | null>(null);
+  const [profileAvatarUrl, setProfileAvatarUrl] = useState<string | null>(null);
+  const [profileAvatarOwnerId, setProfileAvatarOwnerId] = useState<string | null>(null);
+  const [installPrompt, setInstallPrompt] =
+    useState<InstallPromptEvent | null>(null);
   const [profileSaving, setProfileSaving] = useState(false);
   const [profileSaveMessage, setProfileSaveMessage] = useState("");
 
@@ -385,7 +397,31 @@ function App() {
   const [theme, setTheme] = useState<ThemePreference>(readThemePreference);
   const [compactDisplay, setCompactDisplay] = useState(false);
   const sessionUserId = session?.user.id;
-  const [failedProfileAvatarUrl, setFailedProfileAvatarUrl] = useState("");
+  const sessionUserName = String(session?.user.user_metadata?.full_name ?? "");
+
+  useEffect(() => {
+    function captureInstallPrompt(event: Event) {
+      event.preventDefault();
+      setInstallPrompt(event as InstallPromptEvent);
+    }
+
+    function clearInstallPrompt() {
+      setInstallPrompt(null);
+    }
+
+    window.addEventListener(
+      "beforeinstallprompt",
+      captureInstallPrompt as EventListener,
+    );
+    window.addEventListener("appinstalled", clearInstallPrompt);
+    return () => {
+      window.removeEventListener(
+        "beforeinstallprompt",
+        captureInstallPrompt as EventListener,
+      );
+      window.removeEventListener("appinstalled", clearInstallPrompt);
+    };
+  }, []);
   const [showBalance, setShowBalance] = useState(true);
   const [showCardDetails, setShowCardDetails] = useState(false);
   const [generatedCardDetails, setGeneratedCardDetails] =
@@ -549,35 +585,70 @@ function App() {
     };
   }, []);
 
-  // Load the signed-in customer's profile.
+  // Load the signed-in customer's profile and private avatar URL once per user.
   useEffect(() => {
     let cancelled = false;
 
     async function loadProfile() {
-      if (!session?.user) {
+      if (!sessionUserId) {
         setProfileName("");
+        lastSavedProfileName.current = "";
+        setProfileAvatarPath(null);
+        setProfileAvatarUrl(null);
+        setProfileAvatarOwnerId(null);
         return;
       }
 
       const { data, error } = await supabase
         .from("profiles")
-        .select("full_name")
-        .eq("id", session.user.id)
+        .select("full_name, avatar_path")
+        .eq("id", sessionUserId)
         .maybeSingle();
 
       if (cancelled) return;
 
       if (error) {
-        setProfileName(
-          String(session.user.user_metadata?.full_name ?? ""),
-        );
+        console.error("Unable to load the customer profile.", error);
+        setProfileName(sessionUserName);
+        setProfileAvatarPath(null);
+        setProfileAvatarUrl(null);
+        setProfileAvatarOwnerId(null);
         return;
       }
 
       setProfileName(
         data?.full_name ??
-          String(session.user.user_metadata?.full_name ?? ""),
+          sessionUserName,
       );
+      lastSavedProfileName.current = (
+        data?.full_name ??
+        sessionUserName
+      ).trim();
+      const avatarPath = data?.avatar_path;
+      if (
+        typeof avatarPath !== "string" ||
+        !avatarPath.startsWith(`${sessionUserId}/`) ||
+        avatarPath.includes("..")
+      ) {
+        setProfileAvatarPath(null);
+        setProfileAvatarUrl(null);
+        setProfileAvatarOwnerId(null);
+        return;
+      }
+
+      setProfileAvatarPath(avatarPath);
+      setProfileAvatarOwnerId(sessionUserId);
+      const { data: signedUrlData, error: signedUrlError } =
+        await supabase.storage
+          .from("profile-photos")
+          .createSignedUrl(avatarPath, 60 * 60 * 24 * 7);
+      if (cancelled) return;
+      if (signedUrlError) {
+        console.error("Unable to load the private profile picture.", signedUrlError);
+        setProfileAvatarUrl(null);
+        return;
+      }
+      setProfileAvatarUrl(signedUrlData.signedUrl);
     }
 
     void loadProfile();
@@ -585,7 +656,7 @@ function App() {
     return () => {
       cancelled = true;
     };
-  }, [session]);
+  }, [sessionUserId, sessionUserName]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1414,6 +1485,19 @@ function App() {
     );
   }
 
+  async function handleInstallApp() {
+    if (!installPrompt) return;
+
+    try {
+      await installPrompt.prompt();
+      await installPrompt.userChoice;
+      setInstallPrompt(null);
+    } catch (error) {
+      console.error("Unable to open the app installation prompt.", error);
+      showMessage("The install prompt couldn't be opened. Use your browser menu to install or add this app to your home screen.");
+    }
+  }
+
   async function handleSubmitSupportRequest(
     event: FormEvent<HTMLFormElement>,
   ) {
@@ -1548,20 +1632,16 @@ function App() {
     }
   }
 
-  async function handleSaveProfile(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  const lastSavedProfileName = useRef<string>("");
 
-    if (!session?.user) return;
+  async function persistProfileName(name: string): Promise<string | null> {
+    if (!session?.user) return "Please sign in before saving your profile.";
 
-    const cleanedName = profileName.trim();
+    const cleanedName = name.trim();
 
     if (!cleanedName) {
-      setProfileSaveMessage("Please enter your full name.");
-      return;
+      return "Please enter your full name.";
     }
-
-    setProfileSaving(true);
-    setProfileSaveMessage("");
 
     const { error } = await supabase
       .from("profiles")
@@ -1569,27 +1649,62 @@ function App() {
       .eq("id", session.user.id)
       .select("id");
 
-    setProfileSaving(false);
-
     if (error) {
-      setProfileSaveMessage(
-        "We couldn't save your profile. Please try again.",
-      );
-      return;
+      return "We couldn't save your profile. Please try again.";
     }
 
+    lastSavedProfileName.current = cleanedName;
     setProfileName(cleanedName);
+
     const notificationSaved = await createNotification(
       "profile",
       "Profile updated",
       "Your profile details were updated successfully.",
     );
-    setProfileSaveMessage(
-      notificationSaved
-        ? "Your profile has been updated."
-        : "Your profile was updated, but we couldn't save its notification.",
-    );
+
+    return notificationSaved
+      ? null
+      : "Your profile was updated, but we couldn't save its notification.";
   }
+
+  async function handleSaveProfile(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (profileSaving) return;
+
+    setProfileSaving(true);
+    setProfileSaveMessage("");
+
+    const message = await persistProfileName(profileName);
+
+    setProfileSaving(false);
+    setProfileSaveMessage(message ?? "Your profile has been updated.");
+  }
+
+  // Save profile name edits automatically once typing pauses.
+  useEffect(() => {
+    if (!session?.user) return;
+    if (!profileName.trim()) return;
+    if (profileName.trim() === lastSavedProfileName.current) return;
+
+    const timer = window.setTimeout(() => {
+      void (async () => {
+        const latestName = profileName.trim();
+        if (!latestName || latestName === lastSavedProfileName.current) return;
+
+        setProfileSaving(true);
+        const message = await persistProfileName(latestName);
+        setProfileSaving(false);
+        setProfileSaveMessage(message ?? "Saved automatically.");
+      })();
+    }, 900);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
+    // persistProfileName and setters are stable; exclude from deps intentionally.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profileName, session]);
 
   async function handleExportAccountData() {
     if (!session?.user) {
@@ -2037,20 +2152,8 @@ function App() {
     (notification) => !notification.read_at,
   );
   const displayName = profileName.trim() || "Customer";
-  const initials = displayName
-    .split(/\s+/)
-    .map((part) => part.charAt(0))
-    .join("")
-    .slice(0, 2)
-    .toUpperCase();
-  const avatarCandidate =
-    session.user.user_metadata?.avatar_url ??
-    session.user.user_metadata?.picture;
-  const profileAvatarUrl =
-    typeof avatarCandidate === "string" &&
-    /^https?:\/\//i.test(avatarCandidate)
-      ? avatarCandidate
-      : "";
+  const visibleProfileAvatarUrl =
+    profileAvatarOwnerId === session.user.id ? profileAvatarUrl : null;
   return (
     <div
       className="app-shell"
@@ -2119,6 +2222,22 @@ function App() {
 
 
         <div className="sidebar-bottom">
+          <button
+            type="button"
+            className="sidebar-user-profile"
+            onClick={() => navigate("My Profile")}
+            aria-label={`Open profile for ${displayName}`}
+          >
+            <ProfileAvatar
+              name={displayName}
+              imageUrl={visibleProfileAvatarUrl}
+              size="medium"
+            />
+            <span>
+              <strong>{displayName}</strong>
+              <small>{email}</small>
+            </span>
+          </button>
           <div className="security-note">
             <ShieldCheck size={21} />
             <div>
@@ -2207,19 +2326,12 @@ function App() {
                 aria-expanded={profileMenuOpen}
                 aria-controls="profile-options-menu"
               >
-                <span className="avatar topbar-profile-avatar">
-                  {profileAvatarUrl &&
-                  failedProfileAvatarUrl !== profileAvatarUrl ? (
-                    <img
-                      src={profileAvatarUrl}
-                      alt=""
-                      referrerPolicy="no-referrer"
-                      onError={() => setFailedProfileAvatarUrl(profileAvatarUrl)}
-                    />
-                  ) : (
-                    initials
-                  )}
-                </span>
+                <ProfileAvatar
+                  name={displayName}
+                  imageUrl={visibleProfileAvatarUrl}
+                  className="topbar-profile-avatar"
+                  size="small"
+                />
                 <span className="topbar-profile-copy">
                   <strong>{displayName}</strong>
                   <small>Personal account</small>
@@ -2298,6 +2410,17 @@ function App() {
             >
               {theme === "light" ? <Moon size={19} /> : <Sun size={19} />}
             </button>
+
+            {installPrompt && (
+              <button
+                type="button"
+                className="button-secondary install-app-button"
+                onClick={() => void handleInstallApp()}
+              >
+                <Download size={16} />
+                <span>Install App</span>
+              </button>
+            )}
 
             <div className="notifications-container" ref={notificationsRef}>
               <button
@@ -3334,11 +3457,29 @@ function App() {
 
         {activePage === "My Profile" && (
           <section className="page-content">
+            {session?.user && (
+              <ProfilePictureEditor
+                userId={session.user.id}
+                name={displayName}
+                imageUrl={profileAvatarUrl}
+                imagePath={profileAvatarPath}
+                onSaved={(path, signedUrl) => {
+                  setProfileAvatarPath(path);
+                  setProfileAvatarUrl(signedUrl || null);
+                  setProfileAvatarOwnerId(session.user.id);
+                }}
+                onRemoved={() => {
+                  setProfileAvatarPath(null);
+                  setProfileAvatarUrl(null);
+                  setProfileAvatarOwnerId(session.user.id);
+                }}
+              />
+            )}
             <section className="panel profile-panel">
               <div className="panel-header">
                 <div>
                   <h2>Personal information</h2>
-                  <p>Update the name shown on your profile</p>
+                  <p>Update the name shown on your profile — saved automatically as you type</p>
                 </div>
                 <UserRound size={22} />
               </div>
@@ -3373,6 +3514,16 @@ function App() {
                   </small>
                 </label>
 
+                {profileSaving && (
+                  <p
+                    className="profile-save-message"
+                    role="status"
+                    data-saving="true"
+                  >
+                    Saving…
+                  </p>
+                )}
+
                 {profileSaveMessage && (
                   <p
                     className="profile-save-message"
@@ -3394,6 +3545,10 @@ function App() {
                 >
                   {profileSaving ? "Saving..." : "Save changes"}
                 </button>
+
+                <p className="profile-field-hint">
+                  Your changes are saved automatically once you stop typing.
+                </p>
               </form>
             </section>
 
@@ -3405,6 +3560,7 @@ function App() {
             userId={session.user.id}
             email={email}
             profileName={profileName}
+            profileAvatarUrl={visibleProfileAvatarUrl}
             currentTheme={theme}
             currentBalanceVisibility={showBalance}
             currentCompactDisplay={compactDisplay}

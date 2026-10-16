@@ -12,6 +12,13 @@ dist
 dist-ssr
 *.local
 
+# Supabase local state and secrets
+supabase/.temp/
+sbp_*
+
+# Windows reserved device name (phantom file)
+NUL
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
