@@ -4,6 +4,7 @@ import type { FormEvent } from "react";
 import type { Session } from "@supabase/supabase-js";
 import {
   Activity,
+  Bitcoin,
   ArrowDownLeft,
   ArrowLeftRight,
   Home,
@@ -41,6 +42,7 @@ import {
 import "./index.css";
 import Auth from "./Auth";
 import InvestmentsPage from "./InvestmentsPage";
+import CryptoExchangePage, { type CompletedCryptoOrder } from "./CryptoExchangePage";
 import PaymentsPage, { type CompletedPayment } from "./PaymentsPage";
 import { supabase } from "./lib/supabase";
 
@@ -117,6 +119,7 @@ type PageName =
   | "Dashboard"
   | "Accounts"
   | "Investments"
+  | "Crypto Exchange"
   | "Transactions"
   | "Transfers"
   | "Payments"
@@ -306,6 +309,7 @@ const navigation: {
       { name: "Dashboard", icon: Home },
       { name: "Accounts", icon: Landmark },
       { name: "Investments", icon: TrendingUp },
+      { name: "Crypto Exchange", icon: Bitcoin },
       { name: "Transactions", icon: ArrowLeftRight },
       { name: "Transfers", icon: ArrowUpRight },
       { name: "Payments", icon: CreditCard },
@@ -757,7 +761,7 @@ function App() {
       setTransactionsLoading(true);
       setTransactionsError("");
 
-      const [transactionResult, paymentResult] = await Promise.all([
+      const [transactionResult, paymentResult, cryptoResult] = await Promise.all([
         supabase
           .from("transactions")
           .select(
@@ -768,6 +772,13 @@ function App() {
         supabase
           .from("payments")
           .select("id, reference, category, provider, recipient, amount, status, created_at")
+          .eq("user_id", session.user.id)
+          .order("created_at", { ascending: false }),
+        supabase
+          .from("crypto_orders")
+          .select(
+            "order_reference, asset_name, symbol, side, settlement_usd, status, created_at",
+          )
           .eq("user_id", session.user.id)
           .order("created_at", { ascending: false }),
       ]);
@@ -781,8 +792,13 @@ function App() {
         );
         if (paymentResult.error) {
           console.error("Unable to load payment activity.", paymentResult.error);
+        }
+        if (cryptoResult.error) {
+          console.error("Unable to load crypto order activity.", cryptoResult.error);
+        }
+        if (paymentResult.error || cryptoResult.error) {
           setPaymentActivityError(
-            "Payment activity could not be loaded. Apply the payments migration in Supabase and refresh.",
+            "Some account activity could not be loaded. Apply the payment and crypto exchange migrations in Supabase and refresh.",
           );
         } else {
           setPaymentActivityError("");
@@ -800,10 +816,22 @@ function App() {
                 status: payment.status,
                 created_at: payment.created_at,
               }));
+          const cryptoTransactions: DatabaseTransaction[] = cryptoResult.error
+            ? []
+            : (cryptoResult.data ?? []).map((order) => ({
+                id: order.order_reference,
+                description: `${order.side === "buy" ? "Crypto purchase" : "Crypto sale"} · ${order.asset_name} (${order.symbol})`,
+                amount: order.settlement_usd,
+                transaction_type:
+                  order.side === "buy" ? "debit" as const : "credit" as const,
+                status: order.status,
+                created_at: order.created_at,
+              }));
           const savedTransfers = readSavedTransfers(session.user.id);
           const allServerTransactions = [
             ...serverTransactions,
             ...paymentTransactions,
+            ...cryptoTransactions,
           ];
           const serverIds = new Set(allServerTransactions.map(({ id }) => id));
           setDatabaseTransactions([
@@ -812,8 +840,13 @@ function App() {
           ].sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at)));
           if (paymentResult.error) {
             console.error("Unable to load payment activity.", paymentResult.error);
+          }
+          if (cryptoResult.error) {
+            console.error("Unable to load crypto order activity.", cryptoResult.error);
+          }
+          if (paymentResult.error || cryptoResult.error) {
             setPaymentActivityError(
-              "Payment activity could not be loaded. Apply the payments migration in Supabase and refresh.",
+              "Some account activity could not be loaded. Apply the payment and crypto exchange migrations in Supabase and refresh.",
             );
           } else {
             setPaymentActivityError("");
@@ -1156,6 +1189,56 @@ function App() {
       "transaction",
       "Payment confirmed",
       `${formatMoney(Number(payment.amount))} payment to ${payment.provider} recorded. Reference ${payment.reference}.`,
+    );
+  }
+
+  function handleCryptoOrderCompleted(order: CompletedCryptoOrder) {
+    try {
+      const savedTransfers = readSavedTransfers(session?.user.id ?? "");
+      const transferredCents = savedTransfers.reduce(
+        (total, transaction) =>
+          total + Math.round(Number(transaction.amount) * 100),
+        0,
+      );
+      setCustomerAccount((account) =>
+        account
+          ? {
+              ...account,
+              balance:
+                (Math.round(Number(order.balance_after) * 100) -
+                  transferredCents) /
+                100,
+            }
+          : account,
+      );
+      setAccountError("");
+    } catch (storageError) {
+      console.error(
+        "Crypto order completed, but the account balance display could not be reconciled.",
+        storageError,
+      );
+      setAccountError(
+        "Your crypto order completed, but the account balance display couldn't be reconciled with saved transfers. Refresh to reload it.",
+      );
+    }
+
+    const transaction: DatabaseTransaction = {
+      id: order.order_reference,
+      description: `${order.side === "buy" ? "Crypto purchase" : "Crypto sale"} · ${order.asset_name} (${order.symbol})`,
+      amount: order.settlement_usd,
+      transaction_type: order.side === "buy" ? "debit" : "credit",
+      status: "completed",
+      created_at: order.created_at,
+    };
+    setDatabaseTransactions((current) =>
+      current.some(({ id }) => id === transaction.id)
+        ? current
+        : [transaction, ...current],
+    );
+    void createNotification(
+      "transaction",
+      `Crypto ${order.side} completed`,
+      `${order.side === "buy" ? "Bought" : "Sold"} ${order.asset_name} (${order.symbol}) for ${formatMoney(Number(order.settlement_usd))}. Reference ${order.order_reference}.`,
     );
   }
 
@@ -1887,7 +1970,7 @@ function App() {
           </div>
 
           <div className="topbar-actions">
-            {activePage !== "Dashboard" && (
+            {activePage !== "Dashboard" && activePage !== "Crypto Exchange" && (
               <label className="search-box">
                 <Search size={18} aria-hidden="true" />
                 <span className="sr-only">Search transactions</span>
@@ -2146,6 +2229,8 @@ function App() {
                   ? "View your account information."
                   : activePage === "Investments"
                     ? "Explore simulated investments and track your goals."
+                    : activePage === "Crypto Exchange"
+                    ? "Trade cryptocurrency using current market quotes and your account balance."
                     : activePage === "Payments"
                       ? "Pay bills, manage beneficiaries, and review payment activity."
                   : activePage === "Transactions"
@@ -2193,6 +2278,26 @@ function App() {
             userId={session.user.id}
             currency={currency}
             onNotice={showMessage}
+          />
+        )}
+
+        {activePage === "Crypto Exchange" && (
+          <CryptoExchangePage
+            key={session.user.id}
+            userId={session.user.id}
+            bankBalance={
+              customerAccount
+                ? showBalance
+                  ? formatMoney(Number(customerAccount.balance))
+                  : maskedBalance
+                : null
+            }
+            bankBalanceLoading={accountLoading}
+            accountBalance={
+              customerAccount ? Number(customerAccount.balance) : null
+            }
+            accountCurrency={customerAccount?.currency ?? "USD"}
+            onOrderCompleted={handleCryptoOrderCompleted}
           />
         )}
 
