@@ -146,7 +146,7 @@ type PageName =
   | "Dashboard"
   | "Accounts"
   | "Investments"
-  | "Crypto Exchange"
+  | "Crypto"
   | "Transactions"
   | "Transfers"
   | "Payments"
@@ -336,7 +336,7 @@ const navigation: {
       { name: "Dashboard", icon: Home },
       { name: "Accounts", icon: Landmark },
       { name: "Investments", icon: TrendingUp },
-      { name: "Crypto Exchange", icon: Bitcoin },
+      { name: "Crypto", icon: Bitcoin },
       { name: "Transactions", icon: ArrowLeftRight },
       { name: "Transfers", icon: ArrowUpRight },
       { name: "Payments", icon: CreditCard },
@@ -2518,7 +2518,7 @@ function AppShell() {
           />
         )}
 
-        {activePage === "Crypto Exchange" && (
+        {activePage === "Crypto" && (
           <CryptoExchangePage
             key={session.user.id}
             userId={session.user.id}
@@ -2657,7 +2657,7 @@ function AppShell() {
                   <button
                     type="button"
                     className="quick-action quick-action-crypto"
-                    onClick={() => navigate("Crypto Exchange")}
+                    onClick={() => navigate("Crypto")}
                   >
                     <span className="quick-action-icon">
                       <Bitcoin size={20} />
