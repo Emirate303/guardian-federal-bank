@@ -424,29 +424,69 @@ h4 {
   transform: translateY(-7px) rotate(-45deg);
 }
 
-/* ---------- 5. Floating quick-actions bar ---------- */
-
+/* Hamburger visible at all widths, pinned to the top-right edge */
 .quick-actions-bar {
   display: flex;
+  position: sticky;
+  top: 0;
+  z-index: 500;
   align-items: center;
-  justify-content: flex-end;
   width: 100%;
   max-width: 1600px;
   margin: 0 auto;
   min-width: 0;
   gap: 12px;
-  padding: 0 0 10px;
+  padding: 8px 0 10px;
+  background: var(--page-bg);
 }
 
-.quick-actions-bar .topbar-left {
+.quick-actions-bar .topbar-actions {
   display: flex;
   align-items: center;
   min-width: 0;
   gap: 10px;
+  flex: 1;
 }
 
+/* Hamburger pinned to the top-right edge on every page */
 .quick-actions-bar .mobile-menu-button {
-  display: none;
+  display: flex;
+  order: 3;
+  flex: 0 0 44px;
+}
+
+/* Brand lockup shown in the top bar (mark + GUARDIAN / FEDERAL BANK).
+   Rendered right after the hamburger and just before the account button. */
+.topbar-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  order: 2;
+}
+
+.topbar-brand .brand-mark {
+  width: 38px;
+  height: 38px;
+  flex: 0 0 38px;
+  border-radius: 11px;
+}
+
+.topbar-brand .brand-copy {
+  gap: 1px;
+  line-height: 1.25;
+}
+
+.topbar-brand .brand-copy strong {
+  color: var(--navy);
+  font-size: 13px;
+  letter-spacing: 1.1px;
+}
+
+.topbar-brand .brand-copy span {
+  color: var(--muted);
+  font-size: 8.5px;
+  letter-spacing: 1.6px;
 }
 
 .quick-actions-bar .topbar-actions {
@@ -461,7 +501,10 @@ h4 {
 .quick-actions-bar .topbar-account-actions {
   display: flex;
   align-items: center;
-  flex: 0 0 auto;
+  justify-content: flex-end;
+  order: 1;
+  flex: 0 1 auto;
+  min-width: 0;
   gap: 9px;
 }
 
@@ -2069,23 +2112,61 @@ h4 {
 
   .quick-actions-bar {
     display: flex;
+    position: sticky;
+    top: 0;
+    z-index: 500;
     align-items: center;
     width: 100%;
     min-width: 0;
     gap: 10px;
-    padding: 0 0 10px;
+    padding: 8px 0 10px;
+    background: var(--page-bg);
   }
 
-  .quick-actions-bar .topbar-left {
+  .app-shell[data-theme="dark"] .quick-actions-bar {
+    background: var(--page-bg);
+  }
+
+  /* Brand lockup attached directly before the account-details button; the
+     hamburger stays pinned to the top-right edge of the page on all screens */
+  .quick-actions-bar .topbar-brand {
+    order: 2;
     display: flex;
-    flex: 0 0 auto;
     align-items: center;
+    gap: 8px;
     min-width: 0;
-    gap: 10px;
+    padding: 0 2px 0 0;
   }
 
   .quick-actions-bar .mobile-menu-button {
     display: inline-flex;
+    order: 3;
+    margin-left: 0;
+    flex: 0 0 44px;
+  }
+
+  .quick-actions-bar .topbar-brand .brand-copy strong {
+    color: var(--navy);
+    font-size: 12px;
+    letter-spacing: 0.9px;
+  }
+
+  .quick-actions-bar .topbar-brand .brand-copy span {
+    color: var(--muted);
+    font-size: 9px;
+    letter-spacing: 1.2px;
+  }
+
+  .quick-actions-bar .topbar-brand .brand-mark {
+    width: 36px;
+    height: 36px;
+    flex: 0 0 36px;
+    border-radius: 10px;
+  }
+
+  .quick-actions-bar .topbar-brand .brand-mark svg {
+    width: 18px;
+    height: 18px;
   }
 
   .quick-actions-bar .topbar-actions {
@@ -2100,7 +2181,9 @@ h4 {
 
   .quick-actions-bar .topbar-account-actions {
     order: 1;
-    margin-left: auto;
+    flex: 0 1 auto;
+    min-width: 0;
+    margin-right: 0;
     gap: 7px;
   }
 
