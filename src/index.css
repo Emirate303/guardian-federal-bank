@@ -144,7 +144,7 @@ h4 {
   min-height: 100vh;
   min-height: 100dvh;
   margin-left: var(--sidebar-width);
-  padding: 0 30px 24px;
+  padding: 16px 30px 24px;
   transition: margin-left 220ms ease, width 220ms ease;
 }
 
@@ -157,11 +157,11 @@ h4 {
 }
 
 .page-content {
-  padding-top: 28px;
+  padding-top: 12px;
 }
 
 .dashboard-content {
-  padding-top: 24px;
+  padding-top: 8px;
 }
 
 .page-content > *,
@@ -424,46 +424,41 @@ h4 {
   transform: translateY(-7px) rotate(-45deg);
 }
 
-/* ---------- 5. Top navigation bar ---------- */
+/* ---------- 5. Floating quick-actions bar ---------- */
 
-.topbar {
+.quick-actions-bar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
+  width: 100%;
+  max-width: 1600px;
+  margin: 0 auto;
   min-width: 0;
-  gap: 20px;
-  padding: 20px 0;
-  border-bottom: 1px solid var(--border);
+  gap: 12px;
+  padding: 0 0 10px;
 }
 
-.topbar-left {
+.quick-actions-bar .topbar-left {
   display: flex;
   align-items: center;
   min-width: 0;
-  gap: 13px;
+  gap: 10px;
 }
 
-.breadcrumb {
-  min-width: 0;
-  color: var(--muted);
-  font-size: 13px;
-  overflow-wrap: anywhere;
+.quick-actions-bar .mobile-menu-button {
+  display: none;
 }
 
-.breadcrumb strong {
-  color: var(--navy);
-  font-weight: 700;
-}
-
-.topbar-actions {
+.quick-actions-bar .topbar-actions {
   display: flex;
   align-items: center;
   justify-content: flex-end;
   min-width: 0;
-  gap: 15px;
+  gap: 10px;
+  flex: 1;
 }
 
-.topbar-account-actions {
+.quick-actions-bar .topbar-account-actions {
   display: flex;
   align-items: center;
   flex: 0 0 auto;
@@ -1935,11 +1930,11 @@ h4 {
     padding: 19px;
   }
 
-  .topbar {
-    gap: 12px;
+  .quick-actions-bar {
+    gap: 10px;
   }
 
-  .topbar-actions {
+  .quick-actions-bar .topbar-actions {
     gap: 9px;
   }
 }
@@ -2066,58 +2061,41 @@ h4 {
     -webkit-tap-highlight-color: transparent;
   }
 
-  .topbar {
+  .quick-actions-bar {
     display: flex;
-    flex-wrap: wrap;
     align-items: center;
     width: 100%;
     min-width: 0;
-    gap: 12px;
-    padding: 14px 0;
+    gap: 10px;
+    padding: 0 0 10px;
   }
 
-  .topbar-left {
+  .quick-actions-bar .topbar-left {
     display: flex;
-    flex: 1 1 100%;
+    flex: 0 0 auto;
     align-items: center;
     min-width: 0;
     gap: 10px;
   }
 
-  .breadcrumb {
-    flex: 1;
-    min-width: 0;
+  .quick-actions-bar .mobile-menu-button {
+    display: inline-flex;
   }
 
-  .topbar-actions {
+  .quick-actions-bar .topbar-actions {
     display: flex;
-    flex: 1 1 100%;
-    flex-wrap: wrap;
+    flex: 1 1 auto;
     align-items: center;
     justify-content: flex-end;
-    width: 100%;
+    width: auto;
     min-width: 0;
-    gap: 10px;
+    gap: 8px;
   }
 
-  .topbar-account-actions {
+  .quick-actions-bar .topbar-account-actions {
     order: 1;
     margin-left: auto;
     gap: 7px;
-  }
-
-  .search-box {
-    order: 2;
-    box-sizing: border-box;
-    flex: 1 0 100%;
-    min-width: 0;
-    max-width: 100%;
-  }
-
-  .search-box input {
-    box-sizing: border-box;
-    width: 100%;
-    min-width: 0;
   }
 
   .topbar-profile {
@@ -2148,7 +2126,7 @@ h4 {
 
   .page-content,
   .dashboard-content {
-    padding-top: 22px;
+    padding-top: 10px;
   }
 
   .page-heading {
@@ -2405,11 +2383,11 @@ h4 {
 }
 
 @media (max-width: 360px) {
-  .topbar-actions {
+  .quick-actions-bar .topbar-actions {
     gap: 8px;
   }
 
-  .topbar-account-actions {
+  .quick-actions-bar .topbar-account-actions {
     gap: 5px;
   }
 

@@ -10,7 +10,6 @@ import {
   Home,
   ArrowUpRight,
   Bell,
-  CalendarDays,
   CheckCircle2,
   ChevronDown,
   CircleHelp,
@@ -1233,7 +1232,6 @@ function AppShell() {
 
   const filteredTransactions = useMemo(() => {
     const pageQuery = transactionSearch.trim().toLowerCase();
-    const globalQuery = search.trim().toLowerCase();
 
     return databaseTransactions.filter((transaction) => {
       const description = transaction.description.toLowerCase();
@@ -1242,7 +1240,6 @@ function AppShell() {
       );
 
       const matchesPageSearch = description.includes(pageQuery);
-      const matchesGlobalSearch = description.includes(globalQuery);
       const matchesStartDate =
         !transactionStartDate || transactionDate >= transactionStartDate;
       const matchesEndDate =
@@ -1256,7 +1253,6 @@ function AppShell() {
 
       return (
         matchesPageSearch &&
-        matchesGlobalSearch &&
         matchesStartDate &&
         matchesEndDate &&
         matchesType &&
@@ -1266,7 +1262,6 @@ function AppShell() {
   }, [
     databaseTransactions,
     transactionSearch,
-    search,
     transactionStartDate,
     transactionEndDate,
     transactionTypeFilter,
@@ -2259,328 +2254,248 @@ function AppShell() {
       </aside>
 
       <main className="main-content">
-        <header className="topbar">
+
+<div className="quick-actions-bar">
           <div className="topbar-left">
-
-<button
-  type="button"
-  className={`icon-button mobile-menu-button ${
-    menuOpen ? "menu-toggle-open" : ""
-  }`}
-  aria-label={menuOpen ? "Close navigation menu" : "Open navigation menu"}
-  aria-expanded={menuOpen}
-  aria-controls="primary-navigation"
-  onClick={() => setMenuOpen((open) => !open)}
->
-  <span className="hamburger-lines" aria-hidden="true">
-    <span />
-    <span />
-    <span />
-  </span>
-</button>
-
-
-            <div className="breadcrumb">
-              <span>Banking</span>
-              <span className="breadcrumb-divider">/</span>
-              <strong>{activePage}</strong>
-            </div>
-          </div>
-
-          <div className="topbar-actions">
-            {activePage !== "Dashboard" && activePage !== "Crypto Exchange" && (
-              <label className="search-box">
-                <Search size={18} aria-hidden="true" />
-                <span className="sr-only">Search transactions</span>
-                <input
-                  type="search"
-                  placeholder="Search transactions..."
-                  value={search}
-                  onChange={(event) => setSearch(event.target.value)}
-                />
-                {search && (
+            <button
+              type="button"
+              className={`icon-button mobile-menu-button ${
+                menuOpen ? "menu-toggle-open" : ""
+              }`}
+              aria-label={menuOpen ? "Close navigation menu" : "Open navigation menu"}
+              aria-expanded={menuOpen}
+              aria-controls="primary-navigation"
+              onClick={() => setMenuOpen((open) => !open)}
+            >
+              <span className="hamburger-lines" aria-hidden="true">
+                <span />
+                <span />
+                <span />
+              </span>
+            </button>
+            <div className="topbar-actions">
+              <div className="topbar-account-actions">
+                <div className="profile-menu-container" ref={profileMenuRef}>
                   <button
                     type="button"
-                    className="search-clear"
-                    aria-label="Clear search"
-                    onClick={() => setSearch("")}
-                  >
-                    <X size={15} />
-                  </button>
-                )}
-              </label>
-            )}
-
-            <div className="topbar-account-actions">
-            <div className="profile-menu-container" ref={profileMenuRef}>
-              <button
-                type="button"
-                className="topbar-profile topbar-profile-borderless"
-                onClick={() => {
-                  setProfileMenuOpen((open) => !open);
-                  setCloseAccountConfirmOpen(false);
-                }}
-                aria-label={`Profile options for ${displayName}`}
-                aria-haspopup="menu"
-                aria-expanded={profileMenuOpen}
-                aria-controls="profile-options-menu"
-              >
-                <ProfileAvatar
-                  name={displayName}
-                  imageUrl={visibleProfileAvatarUrl}
-                  className="topbar-profile-avatar"
-                  size="small"
-                />
-                <span className="topbar-profile-copy">
-                  <strong>{displayName}</strong>
-                  <small>Personal account</small>
-                </span>
-                <ChevronDown size={16} />
-              </button>
-
-              {profileMenuOpen && (
-                <div
-                  className="profile-options-menu"
-                  id="profile-options-menu"
-                  role="menu"
-                  aria-label="Profile options"
-                >
-                  <button
-                    type="button"
-                    role="menuitem"
+                    className="topbar-profile topbar-profile-borderless"
                     onClick={() => {
-                      navigate("My Profile");
-                      setProfileMenuOpen(false);
+                      setProfileMenuOpen((open) => !open);
+                      setCloseAccountConfirmOpen(false);
                     }}
+                    aria-label={`Profile options for ${displayName}`}
+                    aria-haspopup="menu"
+                    aria-expanded={profileMenuOpen}
+                    aria-controls="profile-options-menu"
                   >
-                    Profile details
+                    <ProfileAvatar
+                      name={displayName}
+                      imageUrl={visibleProfileAvatarUrl}
+                      className="topbar-profile-avatar"
+                      size="small"
+                    />
+                    <span className="topbar-profile-copy">
+                      <strong>{displayName}</strong>
+                      <small>Personal account</small>
+                    </span>
+                    <ChevronDown size={16} />
                   </button>
-                  <button
-                    type="button"
-                    className="profile-close-account"
-                    role="menuitem"
-                    onClick={() =>
-                      setCloseAccountConfirmOpen((open) => !open)
-                    }
-                    aria-expanded={closeAccountConfirmOpen}
-                  >
-                    Close account
-                  </button>
-
-                  {closeAccountConfirmOpen && (
+                  {profileMenuOpen && (
                     <div
-                      className="close-account-confirmation"
-                      role="group"
-                      aria-label="Confirm close account"
+                      className="profile-options-menu"
+                      id="profile-options-menu"
+                      role="menu"
+                      aria-label="Profile options"
                     >
-                      <strong>Delete</strong>
-                      <div>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setProfileMenuOpen(false);
-                            setCloseAccountConfirmOpen(false);
-                            showMessage(
-                              "Your account data was not changed. Contact customer support to request account closure.",
-                            );
-                          }}
+                      <button
+                        type="button"
+                        role="menuitem"
+                        onClick={() => {
+                          navigate("My Profile");
+                          setProfileMenuOpen(false);
+                        }}
+                      >
+                        Profile details
+                      </button>
+                      <button
+                        type="button"
+                        className="profile-close-account"
+                        role="menuitem"
+                        onClick={() =>
+                          setCloseAccountConfirmOpen((open) => !open)
+                        }
+                        aria-expanded={closeAccountConfirmOpen}
+                      >
+                        Close account
+                      </button>
+                      {closeAccountConfirmOpen && (
+                        <div
+                          className="close-account-confirmation"
+                          role="group"
+                          aria-label="Confirm close account"
                         >
-                          Yes
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setCloseAccountConfirmOpen(false)}
-                        >
-                          No
-                        </button>
-                      </div>
+                          <strong>Delete</strong>
+                          <div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setProfileMenuOpen(false);
+                                setCloseAccountConfirmOpen(false);
+                                showMessage(
+                                  "Your account data was not changed. Contact customer support to request account closure.",
+                                );
+                              }}
+                            >
+                              Yes
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setCloseAccountConfirmOpen(false)}
+                            >
+                              No
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
-              )}
-            </div>
-
-            <button
-              type="button"
-              className="icon-button theme-toggle"
-              aria-label={`Switch to ${theme === "light" ? "dark" : "light"} theme`}
-              title={`Switch to ${theme === "light" ? "dark" : "light"} theme`}
-              onClick={() => toggleTheme()}
-            >
-              {theme === "light" ? <Moon size={19} /> : <Sun size={19} />}
-            </button>
-
-            {installPrompt && (
-              <button
-                type="button"
-                className="button-secondary install-app-button"
-                onClick={() => void handleInstallApp()}
-              >
-                <Download size={16} />
-                <span>Install App</span>
-              </button>
-            )}
-
-            <div className="notifications-container" ref={notificationsRef}>
-              <button
-                type="button"
-                className={`icon-button notification-button ${
-                  unreadNotificationCount > 0 ? "has-unread" : ""
-                }`}
-                aria-label={
-                  unreadNotificationCount > 0
-                    ? `Notifications, ${unreadNotificationCount} unread. Latest: ${latestUnreadNotification?.title ?? "New update"}. ${latestUnreadNotification?.message ?? ""}`
-                    : "Notifications"
-                }
-                title={
-                  unreadNotificationCount > 0
-                    ? `${latestUnreadNotification?.title ?? "New update"}${
-                        latestUnreadNotification?.message
-                          ? `: ${latestUnreadNotification.message}`
-                          : ""
-                      }`
-                    : "Notifications"
-                }
-                aria-expanded={notificationsOpen}
-                aria-controls="notifications-panel"
-                onClick={() => setNotificationsOpen((open) => !open)}
-              >
-                <Bell className="notification-bell-icon" size={20} />
-                {unreadNotificationCount > 0 && (
-                  <span
-                    className="notification-count"
-                    aria-live="polite"
-                    aria-atomic="true"
-                  >
-                    {unreadNotificationCount > 99
-                      ? "99+"
-                      : unreadNotificationCount}
-                  </span>
-                )}
-              </button>
-              {notificationsOpen && (
-                <section
-                  className="notifications-panel"
-                  id="notifications-panel"
-                  aria-label="Notifications"
+                <button
+                  type="button"
+                  className="icon-button theme-toggle"
+                  aria-label={`Switch to ${theme === "light" ? "dark" : "light"} theme`}
+                  title={`Switch to ${theme === "light" ? "dark" : "light"} theme`}
+                  onClick={() => toggleTheme()}
                 >
-                  <div className="notifications-panel-header">
-                    <div>
-                      <h2>Notifications</h2>
-                      <span>
-                        {unreadNotificationCount === 0
-                          ? "You're all caught up"
-                          : `${unreadNotificationCount} unread`}
+                  {theme === "light" ? <Moon size={19} /> : <Sun size={19} />}
+                </button>
+                {installPrompt && (
+                  <button
+                    type="button"
+                    className="button-secondary install-app-button"
+                    onClick={() => void handleInstallApp()}
+                  >
+                    <Download size={16} />
+                    <span>Install App</span>
+                  </button>
+                )}
+                <div className="notifications-container" ref={notificationsRef}>
+                  <button
+                    type="button"
+                    className={`icon-button notification-button ${
+                      unreadNotificationCount > 0 ? "has-unread" : ""
+                    }`}
+                    aria-label={
+                      unreadNotificationCount > 0
+                        ? `Notifications, ${unreadNotificationCount} unread. Latest: ${latestUnreadNotification?.title ?? "New update"}. ${latestUnreadNotification?.message ?? ""}`
+                        : "Notifications"
+                    }
+                    title={
+                      unreadNotificationCount > 0
+                        ? `${latestUnreadNotification?.title ?? "New update"}${
+                            latestUnreadNotification?.message
+                              ? `: ${latestUnreadNotification.message}`
+                              : ""
+                          }`
+                        : "Notifications"
+                    }
+                    aria-expanded={notificationsOpen}
+                    aria-controls="notifications-panel"
+                    onClick={() => setNotificationsOpen((open) => !open)}
+                  >
+                    <Bell className="notification-bell-icon" size={20} />
+                    {unreadNotificationCount > 0 && (
+                      <span
+                        className="notification-count"
+                        aria-live="polite"
+                        aria-atomic="true"
+                      >
+                        {unreadNotificationCount > 99
+                          ? "99+"
+                          : unreadNotificationCount}
                       </span>
-                    </div>
-                  </div>
-                  {notificationsError && (
-                    <p className="notifications-error" role="alert">
-                      {notificationsError}
-                    </p>
-                  )}
-                  {notificationsLoading ? (
-                    <p className="notifications-empty" role="status">
-                      Loading notifications...
-                    </p>
-                  ) : notifications.length === 0 ? (
-                    <p className="notifications-empty">
-                      No notifications yet.
-                    </p>
-                  ) : (
-                    <ul className="notifications-list">
-                      {notifications.map((notification) => (
-                        <li
-                          key={notification.id}
-                          className={
-                            notification.read_at
-                              ? "notification-item"
-                              : "notification-item unread"
-                          }
-                        >
-                          <span className="notification-bell-sticker" aria-hidden="true">
-                            <Bell size={15} />
+                    )}
+                  </button>
+                  {notificationsOpen && (
+                    <section
+                      className="notifications-panel"
+                      id="notifications-panel"
+                      aria-label="Notifications"
+                    >
+                      <div className="notifications-panel-header">
+                        <div>
+                          <h2>Notifications</h2>
+                          <span>
+                            {unreadNotificationCount === 0
+                              ? "You're all caught up"
+                              : `${unreadNotificationCount} unread`}
                           </span>
-                          <div className="notification-item-content">
-                            <strong>{notification.title}</strong>
-                            <p>{notification.message}</p>
-                            <time dateTime={notification.created_at}>
-                              {new Date(notification.created_at).toLocaleString(
-                                "en-US",
-                                {
-                                  month: "short",
-                                  day: "numeric",
-                                  hour: "numeric",
-                                  minute: "2-digit",
-                                },
-                              )}
-                            </time>
-                          </div>
-                          {!notification.read_at && (
-                            <button
-                              type="button"
-                              className="notification-mark-read"
-                              onClick={() =>
-                                void markNotificationAsRead(notification.id)
+                        </div>
+                      </div>
+                      {notificationsError && (
+                        <p className="notifications-error" role="alert">
+                          {notificationsError}
+                        </p>
+                      )}
+                      {notificationsLoading ? (
+                        <p className="notifications-empty" role="status">
+                          Loading notifications...
+                        </p>
+                      ) : notifications.length === 0 ? (
+                        <p className="notifications-empty">
+                          No notifications yet.
+                        </p>
+                      ) : (
+                        <ul className="notifications-list">
+                          {notifications.map((notification) => (
+                            <li
+                              key={notification.id}
+                              className={
+                                notification.read_at
+                                  ? "notification-item"
+                                  : "notification-item unread"
                               }
                             >
-                              Mark as read
-                            </button>
-                          )}
-                        </li>
-                      ))}
-                    </ul>
+                              <span className="notification-bell-sticker" aria-hidden="true">
+                                <Bell size={15} />
+                              </span>
+                              <div className="notification-item-content">
+                                <strong>{notification.title}</strong>
+                                <p>{notification.message}</p>
+                                <time dateTime={notification.created_at}>
+                                  {new Date(notification.created_at).toLocaleString(
+                                    "en-US",
+                                    {
+                                      month: "short",
+                                      day: "numeric",
+                                      hour: "numeric",
+                                      minute: "2-digit",
+                                    },
+                                  )}
+                                </time>
+                              </div>
+                              {!notification.read_at && (
+                                <button
+                                  type="button"
+                                  className="notification-mark-read"
+                                  onClick={() =>
+                                    void markNotificationAsRead(notification.id)
+                                  }
+                                >
+                                  Mark as read
+                                </button>
+                              )}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </section>
                   )}
-                </section>
-              )}
-            </div>
+                </div>
+              </div>
             </div>
           </div>
-        </header>
-
-        <div className="page-heading">
-          <div>
-            {activePage !== "Dashboard" && (
-              <p className="eyebrow">ONLINE BANKING</p>
-            )}
-            <h1>{activePage === "Crypto Exchange" ? "Crypto" : activePage}</h1>
-            <p className="page-subtitle">
-              {activePage === "Dashboard"
-                ? "Here's what's happening with your account."
-                : activePage === "Accounts"
-                  ? "View your account information."
-                  : activePage === "Investments"
-                    ? "Explore simulated investments and track your goals."
-                    : activePage === "Crypto Exchange"
-                    ? "Trade cryptocurrency using current market quotes and your account balance."
-                    : activePage === "Payments"
-                      ? "Pay bills, manage beneficiaries, and review payment activity."
-                  : activePage === "Transactions"
-                    ? "Review and filter your transaction history."
-                    : activePage === "My Profile"
-                      ? "Manage your personal information."
-                      : activePage === "Settings"
-                        ? "Manage your profile and preferences."
-                        : activePage === "Customer Support"
-                          ? "Find answers and get help with your account."
-                          : `Explore your ${activePage.toLowerCase()} workspace.`}
-            </p>
-          </div>
-
-          {activePage !== "Dashboard" && (
-            <div className="page-heading-date">
-              <CalendarDays size={17} />
-              <span>
-                {new Date().toLocaleDateString("en-US", {
-                  month: "short",
-                  day: "numeric",
-                  year: "numeric",
-                })}
-              </span>
-            </div>
-          )}
         </div>
-
         {notice && (
           <div className="notice-banner" role="status" aria-live="polite">
             <span>{notice}</span>
