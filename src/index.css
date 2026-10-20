@@ -139,13 +139,11 @@ h4 {
 
 .main-content {
   flex: 1;
-  width: calc(100% - var(--sidebar-width));
+  width: 100%;
   min-width: 0;
   min-height: 100vh;
   min-height: 100dvh;
-  margin-left: var(--sidebar-width);
   padding: 16px 30px 24px;
-  transition: margin-left 220ms ease, width 220ms ease;
 }
 
 .page-content,
@@ -6895,5 +6893,254 @@ h4 {
 
   .profile-picture-actions button {
     flex: 1;
+  }
+}
+
+/* ---------- Header + bottom navigation (mobile-first shell) ---------- */
+
+.app-header {
+  position: sticky;
+  top: 0;
+  z-index: 900;
+  background: var(--navy-dark);
+  color: #fff;
+  box-shadow: 0 1px 0 rgb(255 255 255 / 8%);
+}
+
+.app-header-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 16px;
+}
+
+.app-header .topbar-profile {
+  color: #fff;
+}
+
+.app-header .topbar-profile-avatar {
+  flex-shrink: 0;
+}
+
+.app-header .topbar-profile-copy small {
+  opacity: 0.7;
+}
+
+.header-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.header-brand .brand-mark {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  color: var(--navy-dark);
+  background: var(--gold-light);
+}
+
+.header-brand .brand-copy strong {
+  font-size: 15px;
+  letter-spacing: 2px;
+}
+
+.app-header .icon-button {
+  color: #fff;
+}
+
+.app-header .icon-button:hover {
+  background: rgb(255 255 255 / 10%);
+}
+
+.notice-bar {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 16px 9px;
+  font-size: 12px;
+  color: rgb(255 255 255 / 82%);
+  background: rgb(255 255 255 / 6%);
+}
+
+.app-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 18px 4px 96px;
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+
+.app-footer span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.bottom-nav {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: stretch;
+  background: var(--navy-dark);
+  border-top: 1px solid rgb(255 255 255 / 10%);
+  padding-bottom: env(safe-area-inset-bottom, 0);
+}
+
+.bottom-nav-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 9px 4px 11px;
+  font: inherit;
+  color: rgb(255 255 255 / 72%);
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+
+.bottom-nav-item span {
+  font-size: 11px;
+  letter-spacing: 0.3px;
+}
+
+.bottom-nav-item.active {
+  color: var(--gold-light);
+}
+
+.bottom-nav-item.active span {
+  font-weight: 600;
+}
+
+.bottom-nav-more {
+  position: fixed;
+  right: 12px;
+  bottom: calc(72px + env(safe-area-inset-bottom, 0));
+  z-index: 1001;
+  display: flex;
+  flex-direction: column;
+  min-width: 190px;
+  padding: 6px;
+  border-radius: 14px;
+  background: var(--surface-raised, #fff);
+  color: var(--navy-dark);
+  box-shadow: 0 12px 32px rgb(15 23 42 / 25%);
+}
+
+.bottom-nav-more-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  font: inherit;
+  font-size: 14px;
+  color: inherit;
+  background: none;
+  border: 0;
+  border-radius: 9px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.bottom-nav-more-item:hover,
+.bottom-nav-more-item.active {
+  background: var(--gold-light);
+}
+
+.bottom-nav-more-item.sign-out {
+  color: #b91c1c;
+}
+
+.bottom-nav-more-item.sign-out:hover {
+  background: #fee2e2;
+}
+
+.home-balance-card {
+  max-width: 520px;
+  padding: 22px 24px 20px;
+  border-radius: 22px;
+  color: #fff;
+  background: linear-gradient(135deg, var(--navy-dark), #12233d);
+  box-shadow: 0 14px 34px rgb(15 23 42 / 28%);
+}
+
+.home-balance-card .balance-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.home-balance-card .balance-label {
+  font-size: 13px;
+  color: rgb(255 255 255 / 75%);
+}
+
+.home-balance-card .balance-visibility {
+  color: rgb(255 255 255 / 85%);
+  background: rgb(255 255 255 / 10%);
+}
+
+.home-balance-card .balance-amount {
+  margin: 14px 0 18px;
+  font-size: 34px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+}
+
+.home-balance-card .balance-error {
+  margin: 14px 0 8px;
+  color: #fde2e2;
+}
+
+.home-balance-card .balance-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding-top: 14px;
+  border-top: 1px solid rgb(255 255 255 / 12%);
+  font-size: 12.5px;
+}
+
+.home-balance-card .balance-card-account-number {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: rgb(255 255 255 / 75%);
+}
+
+.home-balance-card .account-copy-button-light {
+  color: rgb(255 255 255 / 80%);
+}
+
+@media (min-width: 1024px) {
+  .bottom-nav,
+  .bottom-nav-more {
+    display: none;
+  }
+
+  .app-footer {
+    padding-bottom: 24px;
+  }
+
+  .home-balance-card {
+    margin-bottom: 18px;
+  }
+}
+
+@media (max-width: 480px) {
+  .home-balance-card .balance-amount {
+    font-size: 29px;
   }
 }

@@ -1,4 +1,3 @@
-
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import type { Session } from "@supabase/supabase-js";
@@ -10,6 +9,7 @@ import {
   Home,
   ArrowUpRight,
   Bell,
+  MoreHorizontal,
   CheckCircle2,
   ChevronDown,
   CircleHelp,
@@ -39,7 +39,9 @@ import {
 import "./index.css";
 import Auth from "./Auth";
 import InvestmentsPage from "./InvestmentsPage";
-import CryptoExchangePage, { type CompletedCryptoOrder } from "./CryptoExchangePage";
+import CryptoExchangePage, {
+  type CompletedCryptoOrder,
+} from "./CryptoExchangePage";
 import PaymentsPage, { type CompletedPayment } from "./PaymentsPage";
 import SettingsPanel from "./SettingsPanel";
 import ProfileAvatar from "./ProfileAvatar";
@@ -208,7 +210,16 @@ type MonthlyActivity = {
 const spendingCategories = [
   {
     name: "Food & dining",
-    keywords: ["restaurant", "cafe", "coffee", "grocery", "groceries", "market", "food", "dining"],
+    keywords: [
+      "restaurant",
+      "cafe",
+      "coffee",
+      "grocery",
+      "groceries",
+      "market",
+      "food",
+      "dining",
+    ],
     color: "#c6a45c",
   },
   {
@@ -218,7 +229,16 @@ const spendingCategories = [
   },
   {
     name: "Transport",
-    keywords: ["fuel", "gas", "uber", "lyft", "transit", "parking", "travel", "airline"],
+    keywords: [
+      "fuel",
+      "gas",
+      "uber",
+      "lyft",
+      "transit",
+      "parking",
+      "travel",
+      "airline",
+    ],
     color: "#4f9c83",
   },
   {
@@ -228,7 +248,15 @@ const spendingCategories = [
   },
   {
     name: "Bills & utilities",
-    keywords: ["utility", "electric", "water", "internet", "phone", "bill", "insurance"],
+    keywords: [
+      "utility",
+      "electric",
+      "water",
+      "internet",
+      "phone",
+      "bill",
+      "insurance",
+    ],
     color: "#628eaa",
   },
   {
@@ -326,31 +354,21 @@ function generateCardDetails(): GeneratedCardDetails {
   };
 }
 
-const navigation: {
-  label: string;
-  items: { name: PageName; icon: typeof Landmark }[];
-}[] = [
-  {
-    label: "BANKING",
-    items: [
-      { name: "Dashboard", icon: Home },
-      { name: "Accounts", icon: Landmark },
-      { name: "Investments", icon: TrendingUp },
-      { name: "Crypto", icon: Bitcoin },
-      { name: "Transactions", icon: ArrowLeftRight },
-      { name: "Transfers", icon: ArrowUpRight },
-      { name: "Payments", icon: CreditCard },
-      { name: "Cards", icon: Wallet },
-    ],
-  },
-  {
-    label: "PREFERENCES",
-    items: [
-      { name: "My Profile", icon: UserRound },
-      { name: "Settings", icon: Settings },
-      { name: "Customer Support", icon: Headset },
-    ],
-  },
+const bottomNavigation: { name: PageName; icon: typeof Landmark }[] = [
+  { name: "Dashboard", icon: Home },
+  { name: "Payments", icon: CreditCard },
+  { name: "Transfers", icon: ArrowLeftRight },
+  { name: "Cards", icon: Wallet },
+];
+
+const moreNavigation: { name: PageName; icon: typeof Landmark }[] = [
+  { name: "Accounts", icon: Landmark },
+  { name: "Investments", icon: TrendingUp },
+  { name: "Crypto", icon: Bitcoin },
+  { name: "Transactions", icon: Activity },
+  { name: "My Profile", icon: UserRound },
+  { name: "Settings", icon: Settings },
+  { name: "Customer Support", icon: Headset },
 ];
 
 function AppShell() {
@@ -358,11 +376,16 @@ function AppShell() {
   const [authLoading, setAuthLoading] = useState(true);
 
   const [profileName, setProfileName] = useState("");
-  const [profileAvatarPath, setProfileAvatarPath] = useState<string | null>(null);
+  const [profileAvatarPath, setProfileAvatarPath] = useState<string | null>(
+    null,
+  );
   const [profileAvatarUrl, setProfileAvatarUrl] = useState<string | null>(null);
-  const [profileAvatarOwnerId, setProfileAvatarOwnerId] = useState<string | null>(null);
-  const [installPrompt, setInstallPrompt] =
-    useState<InstallPromptEvent | null>(null);
+  const [profileAvatarOwnerId, setProfileAvatarOwnerId] = useState<
+    string | null
+  >(null);
+  const [installPrompt, setInstallPrompt] = useState<InstallPromptEvent | null>(
+    null,
+  );
   const [profileSaving, setProfileSaving] = useState(false);
   const [profileSaveMessage, setProfileSaveMessage] = useState("");
 
@@ -392,6 +415,7 @@ function AppShell() {
   const [supportCategory, setSupportCategory] = useState("Account access");
   const [supportMessage, setSupportMessage] = useState("");
   const [activePage, setActivePage] = useState<PageName>("Dashboard");
+  const [bottomNavMoreOpen, setBottomNavMoreOpen] = useState(false);
   const [theme, setTheme] = useState<ThemePreference>(readThemePreference);
   const [compactDisplay, setCompactDisplay] = useState(false);
   const sessionUserId = session?.user.id;
@@ -427,7 +451,6 @@ function AppShell() {
   const [cardFrozen, setCardFrozen] = useState(false);
   const [dailySpendLimit, setDailySpendLimit] = useState("500");
   const [monthlySpendLimit, setMonthlySpendLimit] = useState("2000");
-  const [menuOpen, setMenuOpen] = useState(false);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [closeAccountConfirmOpen, setCloseAccountConfirmOpen] = useState(false);
   const profileMenuRef = useRef<HTMLDivElement>(null);
@@ -475,13 +498,13 @@ function AppShell() {
   const [transferStep, setTransferStep] = useState<TransferStep>("form");
   const [transferError, setTransferError] = useState("");
   const [confirmationReference, setConfirmationReference] = useState("");
-  // Close the mobile navigation with the Escape key.
+  // Close the More menu with the Escape key.
   useEffect(() => {
-    if (!menuOpen) return;
+    if (!bottomNavMoreOpen) return;
 
     function handleEscape(event: KeyboardEvent) {
       if (event.key === "Escape") {
-        setMenuOpen(false);
+        setBottomNavMoreOpen(false);
       }
     }
 
@@ -490,7 +513,7 @@ function AppShell() {
     return () => {
       document.removeEventListener("keydown", handleEscape);
     };
-  }, [menuOpen]);
+  }, [bottomNavMoreOpen]);
 
   useEffect(() => {
     document.documentElement.style.colorScheme = theme;
@@ -535,9 +558,9 @@ function AppShell() {
     }
   }, [selectedTransaction]);
 
-  // Prevent the page behind the open menu from scrolling.
+  // Lock page scroll while the More menu is open.
   useEffect(() => {
-    if (!menuOpen) return;
+    if (!bottomNavMoreOpen) return;
 
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
@@ -545,7 +568,7 @@ function AppShell() {
     return () => {
       document.body.style.overflow = previousOverflow;
     };
-  }, [menuOpen]);
+  }, [bottomNavMoreOpen]);
 
   // Restore the current login session and listen for login/logout changes.
   useEffect(() => {
@@ -614,13 +637,9 @@ function AppShell() {
         return;
       }
 
-      setProfileName(
-        data?.full_name ??
-          sessionUserName,
-      );
+      setProfileName(data?.full_name ?? sessionUserName);
       lastSavedProfileName.current = (
-        data?.full_name ??
-        sessionUserName
+        data?.full_name ?? sessionUserName
       ).trim();
       const avatarPath = data?.avatar_path;
       if (
@@ -642,7 +661,10 @@ function AppShell() {
           .createSignedUrl(avatarPath, 60 * 60 * 24 * 7);
       if (cancelled) return;
       if (signedUrlError) {
-        console.error("Unable to load the private profile picture.", signedUrlError);
+        console.error(
+          "Unable to load the private profile picture.",
+          signedUrlError,
+        );
         setProfileAvatarUrl(null);
         return;
       }
@@ -676,7 +698,10 @@ function AppShell() {
 
       if (cancelled) return;
       if (result.error) {
-        console.error("Unable to load saved application settings.", result.error);
+        console.error(
+          "Unable to load saved application settings.",
+          result.error,
+        );
         return;
       }
 
@@ -694,7 +719,10 @@ function AppShell() {
           try {
             localStorage.setItem("guardian-theme", appearancePreferences.theme);
           } catch (storageError) {
-            console.error("Unable to cache the saved theme preference.", storageError);
+            console.error(
+              "Unable to cache the saved theme preference.",
+              storageError,
+            );
           }
         }
         if (typeof appearancePreferences.balanceVisibility === "boolean") {
@@ -894,9 +922,7 @@ function AppShell() {
         }
 
         if (!data) {
-          setAccountError(
-            "No account is available for this profile yet.",
-          );
+          setAccountError("No account is available for this profile yet.");
         }
       }
 
@@ -926,27 +952,30 @@ function AppShell() {
       setTransactionsLoading(true);
       setTransactionsError("");
 
-      const [transactionResult, paymentResult, cryptoResult] = await Promise.all([
-        supabase
-          .from("transactions")
-          .select(
-            "id, description, amount, transaction_type, status, created_at",
-          )
-          .eq("user_id", session.user.id)
-          .order("created_at", { ascending: false }),
-        supabase
-          .from("payments")
-          .select("id, reference, category, provider, recipient, amount, status, created_at")
-          .eq("user_id", session.user.id)
-          .order("created_at", { ascending: false }),
-        supabase
-          .from("crypto_orders")
-          .select(
-            "order_reference, asset_name, symbol, side, settlement_usd, status, created_at",
-          )
-          .eq("user_id", session.user.id)
-          .order("created_at", { ascending: false }),
-      ]);
+      const [transactionResult, paymentResult, cryptoResult] =
+        await Promise.all([
+          supabase
+            .from("transactions")
+            .select(
+              "id, description, amount, transaction_type, status, created_at",
+            )
+            .eq("user_id", session.user.id)
+            .order("created_at", { ascending: false }),
+          supabase
+            .from("payments")
+            .select(
+              "id, reference, category, provider, recipient, amount, status, created_at",
+            )
+            .eq("user_id", session.user.id)
+            .order("created_at", { ascending: false }),
+          supabase
+            .from("crypto_orders")
+            .select(
+              "order_reference, asset_name, symbol, side, settlement_usd, status, created_at",
+            )
+            .eq("user_id", session.user.id)
+            .order("created_at", { ascending: false }),
+        ]);
 
       if (cancelled) return;
 
@@ -956,10 +985,16 @@ function AppShell() {
           "We couldn't load your transactions. Please refresh and try again.",
         );
         if (paymentResult.error) {
-          console.error("Unable to load payment activity.", paymentResult.error);
+          console.error(
+            "Unable to load payment activity.",
+            paymentResult.error,
+          );
         }
         if (cryptoResult.error) {
-          console.error("Unable to load crypto order activity.", cryptoResult.error);
+          console.error(
+            "Unable to load crypto order activity.",
+            cryptoResult.error,
+          );
         }
         if (paymentResult.error || cryptoResult.error) {
           setPaymentActivityError(
@@ -970,7 +1005,8 @@ function AppShell() {
         }
       } else {
         try {
-          const serverTransactions = (transactionResult.data ?? []) as DatabaseTransaction[];
+          const serverTransactions = (transactionResult.data ??
+            []) as DatabaseTransaction[];
           const paymentTransactions: DatabaseTransaction[] = paymentResult.error
             ? []
             : (paymentResult.data ?? []).map((payment) => ({
@@ -988,7 +1024,9 @@ function AppShell() {
                 description: `${order.side === "buy" ? "Crypto purchase" : "Crypto sale"} · ${order.asset_name} (${order.symbol})`,
                 amount: order.settlement_usd,
                 transaction_type:
-                  order.side === "buy" ? "debit" as const : "credit" as const,
+                  order.side === "buy"
+                    ? ("debit" as const)
+                    : ("credit" as const),
                 status: order.status,
                 created_at: order.created_at,
               }));
@@ -999,15 +1037,25 @@ function AppShell() {
             ...cryptoTransactions,
           ];
           const serverIds = new Set(allServerTransactions.map(({ id }) => id));
-          setDatabaseTransactions([
-            ...savedTransfers.filter(({ id }) => !serverIds.has(id)),
-            ...allServerTransactions,
-          ].sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at)));
+          setDatabaseTransactions(
+            [
+              ...savedTransfers.filter(({ id }) => !serverIds.has(id)),
+              ...allServerTransactions,
+            ].sort(
+              (a, b) => Date.parse(b.created_at) - Date.parse(a.created_at),
+            ),
+          );
           if (paymentResult.error) {
-            console.error("Unable to load payment activity.", paymentResult.error);
+            console.error(
+              "Unable to load payment activity.",
+              paymentResult.error,
+            );
           }
           if (cryptoResult.error) {
-            console.error("Unable to load crypto order activity.", cryptoResult.error);
+            console.error(
+              "Unable to load crypto order activity.",
+              cryptoResult.error,
+            );
           }
           if (paymentResult.error || cryptoResult.error) {
             setPaymentActivityError(
@@ -1103,10 +1151,16 @@ function AppShell() {
       );
       const income = monthTransactions
         .filter((transaction) => transaction.transaction_type === "credit")
-        .reduce((total, transaction) => total + Math.abs(Number(transaction.amount)), 0);
+        .reduce(
+          (total, transaction) => total + Math.abs(Number(transaction.amount)),
+          0,
+        );
       const spending = monthTransactions
         .filter((transaction) => transaction.transaction_type === "debit")
-        .reduce((total, transaction) => total + Math.abs(Number(transaction.amount)), 0);
+        .reduce(
+          (total, transaction) => total + Math.abs(Number(transaction.amount)),
+          0,
+        );
       const periodEnd =
         date.getFullYear() === end.getFullYear() &&
         date.getMonth() === end.getMonth()
@@ -1139,7 +1193,10 @@ function AppShell() {
         })
         .reduce((total, transaction) => {
           const amount = Math.abs(Number(transaction.amount));
-          return total + (transaction.transaction_type === "credit" ? amount : -amount);
+          return (
+            total +
+            (transaction.transaction_type === "credit" ? amount : -amount)
+          );
         }, 0);
 
       months.push({
@@ -1161,12 +1218,18 @@ function AppShell() {
 
   const monthlyIncome = dashboardCompletedTransactions
     .filter((transaction) => transaction.transaction_type === "credit")
-    .reduce((total, transaction) => total + Math.abs(Number(transaction.amount)), 0);
+    .reduce(
+      (total, transaction) => total + Math.abs(Number(transaction.amount)),
+      0,
+    );
   void monthlyIncome;
 
   const monthlySpending = dashboardCompletedTransactions
     .filter((transaction) => transaction.transaction_type === "debit")
-    .reduce((total, transaction) => total + Math.abs(Number(transaction.amount)), 0);
+    .reduce(
+      (total, transaction) => total + Math.abs(Number(transaction.amount)),
+      0,
+    );
   void monthlySpending;
 
   const currentDate = toDateInputValue(new Date());
@@ -1178,7 +1241,10 @@ function AppShell() {
         transaction.transaction_type === "debit" &&
         toDateInputValue(new Date(transaction.created_at)) === currentDate,
     )
-    .reduce((total, transaction) => total + Math.abs(Number(transaction.amount)), 0);
+    .reduce(
+      (total, transaction) => total + Math.abs(Number(transaction.amount)),
+      0,
+    );
   const currentMonthSpending = databaseTransactions
     .filter(
       (transaction) =>
@@ -1187,7 +1253,10 @@ function AppShell() {
         toDateInputValue(new Date(transaction.created_at)).slice(0, 7) ===
           currentMonth,
     )
-    .reduce((total, transaction) => total + Math.abs(Number(transaction.amount)), 0);
+    .reduce(
+      (total, transaction) => total + Math.abs(Number(transaction.amount)),
+      0,
+    );
 
   const categoryTotals = useMemo(() => {
     const totals = new Map<string, number>();
@@ -1207,8 +1276,8 @@ function AppShell() {
         name,
         amount,
         color:
-          spendingCategories.find((category) => category.name === name)?.color ??
-          "#9aa3b4",
+          spendingCategories.find((category) => category.name === name)
+            ?.color ?? "#9aa3b4",
       }))
       .sort((first, second) => second.amount - first.amount);
   }, [dashboardCompletedTransactions]);
@@ -1289,7 +1358,7 @@ function AppShell() {
 
   function navigate(page: PageName) {
     setActivePage(page);
-    setMenuOpen(false);
+    setBottomNavMoreOpen(false);
     setNotice("");
     setProfileSaveMessage("");
   }
@@ -1424,11 +1493,15 @@ function AppShell() {
     if (error) {
       console.error("Unable to create notification.", error);
       setNotificationsError("A notification couldn't be saved.");
-      showMessage("The update completed, but its notification couldn't be saved.");
+      showMessage(
+        "The update completed, but its notification couldn't be saved.",
+      );
       return false;
     }
 
-    setNotifications((current) => [data as UserNotification, ...current].slice(0, 50));
+    setNotifications((current) =>
+      [data as UserNotification, ...current].slice(0, 50),
+    );
     setNotificationsError("");
     return true;
   }
@@ -1488,13 +1561,13 @@ function AppShell() {
       setInstallPrompt(null);
     } catch (error) {
       console.error("Unable to open the app installation prompt.", error);
-      showMessage("The install prompt couldn't be opened. Use your browser menu to install or add this app to your home screen.");
+      showMessage(
+        "The install prompt couldn't be opened. Use your browser menu to install or add this app to your home screen.",
+      );
     }
   }
 
-  async function handleSubmitSupportRequest(
-    event: FormEvent<HTMLFormElement>,
-  ) {
+  async function handleSubmitSupportRequest(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setSupportFormMessage("");
 
@@ -1524,10 +1597,7 @@ function AppShell() {
         return;
       }
 
-      setSupportTickets((tickets) => [
-        data as SupportTicket,
-        ...tickets,
-      ]);
+      setSupportTickets((tickets) => [data as SupportTicket, ...tickets]);
       setSupportSubject("");
       setSupportCategory("Account access");
       setSupportMessage("");
@@ -1554,13 +1624,13 @@ function AppShell() {
       dailyLimit <= 0 ||
       monthlyLimit <= 0
     ) {
-      showMessage("Enter a daily and monthly spending limit greater than zero.");
+      showMessage(
+        "Enter a daily and monthly spending limit greater than zero.",
+      );
       return;
     }
 
-    showMessage(
-      "Spending limits updated.",
-    );
+    showMessage("Spending limits updated.");
     void createNotification(
       "profile",
       "Spending limits updated",
@@ -1570,13 +1640,19 @@ function AppShell() {
 
   function downloadTransactionStatement() {
     const escapeCsvValue = (value: string) => {
-      const safeValue = /^[\t\r ]*[=+\-@]/.test(value)
-        ? `'${value}`
-        : value;
+      const safeValue = /^[\t\r ]*[=+\-@]/.test(value) ? `'${value}` : value;
       return `"${safeValue.replaceAll('"', '""')}"`;
     };
     const rows = [
-      ["Reference", "Date", "Description", "Type", "Amount", "Currency", "Status"],
+      [
+        "Reference",
+        "Date",
+        "Description",
+        "Type",
+        "Amount",
+        "Currency",
+        "Status",
+      ],
       ...filteredTransactions.map((transaction) => [
         transaction.id,
         new Date(transaction.created_at).toISOString(),
@@ -1720,33 +1796,81 @@ function AppShell() {
       supportTicketsExport,
     ] = await Promise.all([
       supabase.from("profiles").select("*").eq("id", userId).maybeSingle(),
-      supabase.from("user_settings").select("preferences, updated_at").eq("user_id", userId).maybeSingle(),
+      supabase
+        .from("user_settings")
+        .select("preferences, updated_at")
+        .eq("user_id", userId)
+        .maybeSingle(),
       readAllExportRows((start, end) =>
-        supabase.from("accounts").select("*").eq("user_id", userId).range(start, end),
+        supabase
+          .from("accounts")
+          .select("*")
+          .eq("user_id", userId)
+          .range(start, end),
       ),
       readAllExportRows((start, end) =>
-        supabase.from("transactions").select("*").eq("user_id", userId).order("created_at", { ascending: false }).range(start, end),
+        supabase
+          .from("transactions")
+          .select("*")
+          .eq("user_id", userId)
+          .order("created_at", { ascending: false })
+          .range(start, end),
       ),
       readAllExportRows((start, end) =>
-        supabase.from("payments").select("*").eq("user_id", userId).order("created_at", { ascending: false }).range(start, end),
+        supabase
+          .from("payments")
+          .select("*")
+          .eq("user_id", userId)
+          .order("created_at", { ascending: false })
+          .range(start, end),
       ),
       readAllExportRows((start, end) =>
-        supabase.from("crypto_orders").select("*").eq("user_id", userId).order("created_at", { ascending: false }).range(start, end),
+        supabase
+          .from("crypto_orders")
+          .select("*")
+          .eq("user_id", userId)
+          .order("created_at", { ascending: false })
+          .range(start, end),
       ),
       readAllExportRows((start, end) =>
-        supabase.from("investments").select("*").eq("user_id", userId).order("created_at", { ascending: false }).range(start, end),
+        supabase
+          .from("investments")
+          .select("*")
+          .eq("user_id", userId)
+          .order("created_at", { ascending: false })
+          .range(start, end),
       ),
       readAllExportRows((start, end) =>
-        supabase.from("investment_goals").select("*").eq("user_id", userId).order("created_at", { ascending: false }).range(start, end),
+        supabase
+          .from("investment_goals")
+          .select("*")
+          .eq("user_id", userId)
+          .order("created_at", { ascending: false })
+          .range(start, end),
       ),
       readAllExportRows((start, end) =>
-        supabase.from("payment_beneficiaries").select("*").eq("user_id", userId).order("created_at", { ascending: false }).range(start, end),
+        supabase
+          .from("payment_beneficiaries")
+          .select("*")
+          .eq("user_id", userId)
+          .order("created_at", { ascending: false })
+          .range(start, end),
       ),
       readAllExportRows((start, end) =>
-        supabase.from("user_notifications").select("*").eq("user_id", userId).order("created_at", { ascending: false }).range(start, end),
+        supabase
+          .from("user_notifications")
+          .select("*")
+          .eq("user_id", userId)
+          .order("created_at", { ascending: false })
+          .range(start, end),
       ),
       readAllExportRows((start, end) =>
-        supabase.from("support_tickets").select("*").eq("user_id", userId).order("created_at", { ascending: false }).range(start, end),
+        supabase
+          .from("support_tickets")
+          .select("*")
+          .eq("user_id", userId)
+          .order("created_at", { ascending: false })
+          .range(start, end),
       ),
     ]);
     const failedResult = [profileResult, settingsResult].find(
@@ -1754,14 +1878,19 @@ function AppShell() {
     );
     if (failedResult?.error) {
       console.error("An account data export query failed.", failedResult.error);
-      throw new Error("Some of your account data could not be exported. Please try again or contact Support.");
+      throw new Error(
+        "Some of your account data could not be exported. Please try again or contact Support.",
+      );
     }
 
     let localTransfers: DatabaseTransaction[];
     try {
       localTransfers = readSavedTransfers(userId);
     } catch (error) {
-      console.error("Unable to include saved transfer data in the export.", error);
+      console.error(
+        "Unable to include saved transfer data in the export.",
+        error,
+      );
       throw new Error(
         "Your locally saved transfer data could not be exported. Please contact Support.",
         { cause: error },
@@ -1813,7 +1942,7 @@ function AppShell() {
     setActivePage("Dashboard");
     setSearch("");
     setTransactionSearch("");
-    setMenuOpen(false);
+    setBottomNavMoreOpen(false);
     setNotice("");
   }
 
@@ -1861,7 +1990,9 @@ function AppShell() {
       return "Transfer amount must be greater than zero.";
     }
 
-    if (Math.abs(amountValue * 100 - Math.round(amountValue * 100)) > 0.000001) {
+    if (
+      Math.abs(amountValue * 100 - Math.round(amountValue * 100)) > 0.000001
+    ) {
       return "Enter an amount with no more than two decimal places.";
     }
 
@@ -1891,7 +2022,9 @@ function AppShell() {
     }
 
     if (!customerAccount) {
-      setTransferError("Your account balance is unavailable. Transfer can't continue.");
+      setTransferError(
+        "Your account balance is unavailable. Transfer can't continue.",
+      );
       return;
     }
 
@@ -1921,7 +2054,9 @@ function AppShell() {
         transferForm.bankName.trim(),
         `account ending ${transferForm.accountNumber.trim().slice(-4)}`,
         `routing ending ${transferForm.routingNumber.trim().slice(-4)}`,
-        transferForm.remark.trim() ? `Remark: ${transferForm.remark.trim()}` : "",
+        transferForm.remark.trim()
+          ? `Remark: ${transferForm.remark.trim()}`
+          : "",
       ]
         .filter(Boolean)
         .join(" · "),
@@ -1941,7 +2076,10 @@ function AppShell() {
         ]),
       );
     } catch (storageError) {
-      console.error("Unable to save the transfer for this device.", storageError);
+      console.error(
+        "Unable to save the transfer for this device.",
+        storageError,
+      );
       setTransferError(
         "We couldn't save this transfer on your device. Check browser storage and try again.",
       );
@@ -1990,34 +2128,33 @@ function AppShell() {
     limit?: number,
   ) {
     const visibleTransactions =
-      typeof limit === "number"
-        ? transactions.slice(0, limit)
-        : transactions;
+      typeof limit === "number" ? transactions.slice(0, limit) : transactions;
 
     if (visibleTransactions.length === 0) {
       return (
         <div className="empty-state">
-            {search.trim() ||
-            transactionSearch.trim() ||
-            transactionStartDate ||
-            transactionEndDate ||
-            transactionTypeFilter !== "all" ||
-            transactionStatusFilter !== "all"
-              ? "No transactions match your filters."
-              : "No transactions yet. Your activity will appear here when available."}
-          </div>
+          {search.trim() ||
+          transactionSearch.trim() ||
+          transactionStartDate ||
+          transactionEndDate ||
+          transactionTypeFilter !== "all" ||
+          transactionStatusFilter !== "all"
+            ? "No transactions match your filters."
+            : "No transactions yet. Your activity will appear here when available."}
+        </div>
       );
     }
 
     return visibleTransactions.map((transaction) => {
       const incoming = transaction.transaction_type === "credit";
-      const date = new Date(
-        transaction.created_at,
-      ).toLocaleDateString("en-US", {
-        day: "2-digit",
-        month: "short",
-        year: "numeric",
-      });
+      const date = new Date(transaction.created_at).toLocaleDateString(
+        "en-US",
+        {
+          day: "2-digit",
+          month: "short",
+          year: "numeric",
+        },
+      );
 
       return (
         <button
@@ -2033,7 +2170,11 @@ function AppShell() {
             className={`transaction-icon ${incoming ? "incoming" : ""}`}
             aria-hidden="true"
           >
-            {incoming ? <ArrowDownLeft size={19} /> : <ArrowUpRight size={19} />}
+            {incoming ? (
+              <ArrowDownLeft size={19} />
+            ) : (
+              <ArrowUpRight size={19} />
+            )}
           </span>
 
           <span className="transaction-info">
@@ -2043,9 +2184,7 @@ function AppShell() {
             </span>
           </span>
 
-          <span
-            className={`transaction-amount ${incoming ? "positive" : ""}`}
-          >
+          <span className={`transaction-amount ${incoming ? "positive" : ""}`}>
             <strong>
               {incoming ? "+" : "−"}
               {showBalance
@@ -2109,8 +2248,7 @@ function AppShell() {
     return (
       <div className="empty-state" role="alert">
         <p>
-          {accountError ||
-            "Your account details are not available right now."}
+          {accountError || "Your account details are not available right now."}
         </p>
         <button
           type="button"
@@ -2154,126 +2292,50 @@ function AppShell() {
       data-theme={theme}
       data-compact={compactDisplay ? "true" : "false"}
     >
-      {menuOpen && (
-        <button
-          type="button"
-          className="mobile-overlay"
-          aria-label="Close navigation menu"
-          onClick={() => setMenuOpen(false)}
-        />
-      )}
-
-     <aside
-  id="primary-navigation"
-  className={`sidebar ${menuOpen ? "sidebar-open" : ""}`}
-  aria-label="Main navigation"
->
-
-<div className="sidebar-brand">
-  <div className="brand-mark">
-    <Landmark size={25} />
-  </div>
-
-  <div className="brand-copy">
-    <strong>GUARDIAN</strong>
-    <span>FEDERAL BANK</span>
-  </div>
-
-  <button
-    type="button"
-    className="icon-button sidebar-close"
-    aria-label="Close sidebar"
-    onClick={() => setMenuOpen(false)}
-  >
-    <X size={21} />
-  </button>
-</div>
-
-
-
-<nav className="sidebar-nav" aria-label="Main navigation">
-  {navigation.map((group) => (
-    <div className="nav-group" key={group.label}>
-      <p className="nav-label">{group.label}</p>
-
-      {group.items.map(({ name, icon: Icon }) => (
-        <button
-          type="button"
-          key={name}
-          className={`nav-item ${
-            activePage === name ? "active" : ""
-          }`}
-          aria-current={activePage === name ? "page" : undefined}
-          onClick={() => navigate(name)}
-        >
-          <Icon size={19} />
-          <span>{name}</span>
-        </button>
-      ))}
-    </div>
-  ))}
-</nav>
-
-
-        <div className="sidebar-bottom">
+      <header className="app-header">
+        <div className="app-header-top">
           <button
             type="button"
-            className="sidebar-user-profile"
+            className="topbar-profile topbar-profile-borderless"
             onClick={() => navigate("My Profile")}
             aria-label={`Open profile for ${displayName}`}
           >
             <ProfileAvatar
               name={displayName}
               imageUrl={visibleProfileAvatarUrl}
-              size="medium"
+              className="topbar-profile-avatar"
+              size="small"
             />
-            <span>
+            <span className="topbar-profile-copy">
+              <small>My Profile</small>
               <strong>{displayName}</strong>
-              <small>{email}</small>
             </span>
           </button>
-          <div className="security-note">
-            <ShieldCheck size={21} />
-            <div>
-              <strong>Secure banking</strong>
-              <span>Your account is protected</span>
-            </div>
+          <div className="header-brand" aria-hidden="true">
+            <span className="brand-mark">
+              <Landmark size={20} />
+            </span>
+            <span className="brand-copy">
+              <strong>GFB</strong>
+            </span>
           </div>
-
           <button
             type="button"
-            className="nav-item sign-out"
-            onClick={handleSignOut}
+            className="icon-button"
+            aria-label="Contact customer support"
+            onClick={() => navigate("Customer Support")}
           >
-            <LogOut size={19} />
-            <span>Sign out</span>
+            <Headset size={19} />
           </button>
-
-          <p className="sidebar-version">Online Banking</p>
         </div>
-      </aside>
+        <div className="notice-bar" role="status">
+          <ShieldCheck size={13} />
+          <span>Your account is protected by Guardian Federal Bank security.</span>
+        </div>
+      </header>
 
       <main className="main-content">
-
-<div className="quick-actions-bar">
-          <div className="topbar-left">
-            <button
-              type="button"
-              className={`icon-button mobile-menu-button ${
-                menuOpen ? "menu-toggle-open" : ""
-              }`}
-              aria-label={menuOpen ? "Close navigation menu" : "Open navigation menu"}
-              aria-expanded={menuOpen}
-              aria-controls="primary-navigation"
-              onClick={() => setMenuOpen((open) => !open)}
-            >
-              <span className="hamburger-lines" aria-hidden="true">
-                <span />
-                <span />
-                <span />
-              </span>
-            </button>
-            <div className="topbar-actions">
+        <div className="topbar-actions">
               <div className="topbar-account-actions">
                 <div className="profile-menu-container" ref={profileMenuRef}>
                   <button
@@ -2456,22 +2518,24 @@ function AppShell() {
                                   : "notification-item unread"
                               }
                             >
-                              <span className="notification-bell-sticker" aria-hidden="true">
+                              <span
+                                className="notification-bell-sticker"
+                                aria-hidden="true"
+                              >
                                 <Bell size={15} />
                               </span>
                               <div className="notification-item-content">
                                 <strong>{notification.title}</strong>
                                 <p>{notification.message}</p>
                                 <time dateTime={notification.created_at}>
-                                  {new Date(notification.created_at).toLocaleString(
-                                    "en-US",
-                                    {
-                                      month: "short",
-                                      day: "numeric",
-                                      hour: "numeric",
-                                      minute: "2-digit",
-                                    },
-                                  )}
+                                  {new Date(
+                                    notification.created_at,
+                                  ).toLocaleString("en-US", {
+                                    month: "short",
+                                    day: "numeric",
+                                    hour: "numeric",
+                                    minute: "2-digit",
+                                  })}
                                 </time>
                               </div>
                               {!notification.read_at && (
@@ -2494,8 +2558,6 @@ function AppShell() {
                 </div>
               </div>
             </div>
-          </div>
-        </div>
         {notice && (
           <div className="notice-banner" role="status" aria-live="polite">
             <span>{notice}</span>
@@ -2539,7 +2601,10 @@ function AppShell() {
         )}
 
         {activePage === "Dashboard" && (
-          <section className="dashboard-content" aria-label="Dashboard overview">
+          <section
+            className="dashboard-content"
+            aria-label="Dashboard overview"
+          >
             <div className="welcome-row">
               <div>
                 <h2>Welcome back, {displayName.split(" ")[0]}!</h2>
@@ -2548,83 +2613,90 @@ function AppShell() {
             </div>
 
             {dashboardWidgets.balance && (
-              <div className="balance-grid dashboard-account-balance">
-                  <section className="balance-card">
-                    <div className="balance-card-top">
-                      <span className="balance-label">Total account balance</span>
+              <section className="home-balance-card">
+                <div className="balance-card-top">
+                    <span className="balance-label">Total account balance</span>
+                    <button
+                      type="button"
+                      className="balance-visibility"
+                      onClick={() => setShowBalance((current) => !current)}
+                      aria-label={
+                        showBalance
+                          ? "Hide account balances"
+                          : "Show account balances"
+                      }
+                      title={
+                        showBalance
+                          ? "Hide account balances"
+                          : "Show account balances"
+                      }
+                    >
+                      {showBalance ? <Eye size={19} /> : <EyeOff size={19} />}
+                    </button>
+                  </div>
+
+                  {accountLoading ? (
+                    <p className="balance-amount" role="status">
+                      Loading...
+                    </p>
+                  ) : accountError ? (
+                    <div className="balance-error" role="alert">
+                      <p>{accountError}</p>
                       <button
                         type="button"
-                        className="balance-visibility"
-                        onClick={() => setShowBalance((current) => !current)}
-                        aria-label={
-                          showBalance ? "Hide account balances" : "Show account balances"
-                        }
-                        title={showBalance ? "Hide account balances" : "Show account balances"}
+                        className="button-secondary"
+                        onClick={refreshPage}
                       >
-                        {showBalance ? <Eye size={19} /> : <EyeOff size={19} />}
+                        Refresh page
                       </button>
                     </div>
+                  ) : (
+                    <p className="balance-amount">
+                      {showBalance
+                        ? formatMoney(Number(customerAccount?.balance ?? 0))
+                        : maskedBalance}
+                    </p>
+                  )}
 
-                    {accountLoading ? (
-                      <p className="balance-amount" role="status">
-                        Loading...
-                      </p>
-                    ) : accountError ? (
-                      <div className="balance-error" role="alert">
-                        <p>{accountError}</p>
+                  <div className="balance-card-footer">
+                    <span className="account-type-status">
+                      <span
+                        className={`account-status-indicator ${
+                          customerAccount ? "active" : "unavailable"
+                        }`}
+                        aria-hidden="true"
+                      />
+                      {customerAccount
+                        ? `${customerAccount.account_type} · Active`
+                        : accountLoading
+                          ? "Checking account status"
+                          : "Account unavailable"}
+                    </span>
+                    <span className="balance-card-account-number">
+                      {customerAccount?.account_number
+                        ? `•••• ${customerAccount.account_number.slice(-4)}`
+                        : "Number unavailable"}
+                      {customerAccount?.account_number && (
                         <button
                           type="button"
-                          className="button-secondary"
-                          onClick={refreshPage}
+                          className="account-copy-button account-copy-button-light"
+                          aria-label="Copy full account number"
+                          title="Copy account number"
+                          onClick={handleCopyAccountNumber}
                         >
-                          Refresh page
+                          <Copy size={14} />
                         </button>
-                      </div>
-                    ) : (
-                      <p className="balance-amount">
-                        {showBalance
-                          ? formatMoney(Number(customerAccount?.balance ?? 0))
-                          : maskedBalance}
-                      </p>
+                      )}
+                            </span>
+                          </div>
+                        </section>
                     )}
 
-                    <div className="balance-card-footer">
-                      <span className="account-type-status">
-                        <span
-                          className={`account-status-indicator ${
-                            customerAccount ? "active" : "unavailable"
-                          }`}
-                          aria-hidden="true"
-                        />
-                        {customerAccount
-                          ? `${customerAccount.account_type} · Active`
-                          : accountLoading
-                            ? "Checking account status"
-                            : "Account unavailable"}
-                      </span>
-                      <span className="balance-card-account-number">
-                        {customerAccount?.account_number
-                          ? `•••• ${customerAccount.account_number.slice(-4)}`
-                          : "Number unavailable"}
-                        {customerAccount?.account_number && (
-                          <button
-                            type="button"
-                            className="account-copy-button account-copy-button-light"
-                            aria-label="Copy full account number"
-                            title="Copy account number"
-                            onClick={handleCopyAccountNumber}
-                          >
-                            <Copy size={14} />
-                          </button>
-                        )}
-                      </span>
-                    </div>
-                  </section>
-              </div>
-            )}
-
-            {dashboardWidgets.quickActions && (
-              <section className="quick-actions-panel dashboard-quick-actions" aria-label="Quick actions">
+                    {dashboardWidgets.quickActions && (
+              <section
+                className="quick-actions-panel dashboard-quick-actions"
+                aria-label="Quick actions"
+              >
                 <div className="quick-actions">
                   <button
                     type="button"
@@ -2682,9 +2754,12 @@ function AppShell() {
                       <span>Selected period</span>
                     </div>
                     <p className="summary-label">Money in</p>
-                    <h3>{showBalance ? formatMoney(monthlyIncome) : maskedBalance}</h3>
+                    <h3>
+                      {showBalance ? formatMoney(monthlyIncome) : maskedBalance}
+                    </h3>
                     <p className="summary-footnote">
-                      <span className="positive-text">Credits</span> · Completed transactions
+                      <span className="positive-text">Credits</span> · Completed
+                      transactions
                     </p>
                   </section>
                 )}
@@ -2698,7 +2773,11 @@ function AppShell() {
                       <span>Selected period</span>
                     </div>
                     <p className="summary-label">Money out</p>
-                    <h3>{showBalance ? formatMoney(monthlySpending) : maskedBalance}</h3>
+                    <h3>
+                      {showBalance
+                        ? formatMoney(monthlySpending)
+                        : maskedBalance}
+                    </h3>
                     <p className="summary-footnote">
                       Debits · Completed transactions
                     </p>
@@ -2717,8 +2796,14 @@ function AppShell() {
                         <p>Monthly completed transactions in this period</p>
                       </div>
                       <div className="chart-legend" aria-label="Chart legend">
-                        <span><i className="legend-income" />Income</span>
-                        <span><i className="legend-expense" />Expenses</span>
+                        <span>
+                          <i className="legend-income" />
+                          Income
+                        </span>
+                        <span>
+                          <i className="legend-expense" />
+                          Expenses
+                        </span>
                       </div>
                     </div>
                     {dashboardCompletedTransactions.length === 0 ? (
@@ -2742,13 +2827,17 @@ function AppShell() {
                             const slot = 662 / monthlyActivity.length;
                             const center = 42 + slot * (index + 0.5);
                             const barWidth = Math.min(20, slot * 0.32);
-                            const incomeHeight = (month.income / cashflowMax) * 145;
-                            const spendingHeight = (month.spending / cashflowMax) * 145;
+                            const incomeHeight =
+                              (month.income / cashflowMax) * 145;
+                            const spendingHeight =
+                              (month.spending / cashflowMax) * 145;
 
                             return (
                               <g key={month.date.toISOString()}>
                                 <title>
-                                  {month.label}: income {formatMoney(month.income)}, expenses {formatMoney(month.spending)}
+                                  {month.label}: income{" "}
+                                  {formatMoney(month.income)}, expenses{" "}
+                                  {formatMoney(month.spending)}
                                 </title>
                                 <rect
                                   className="cashflow-income-bar"
@@ -2766,7 +2855,8 @@ function AppShell() {
                                   height={spendingHeight}
                                   rx="4"
                                 />
-                                {(monthlyActivity.length <= 8 || index % 2 === 0) && (
+                                {(monthlyActivity.length <= 8 ||
+                                  index % 2 === 0) && (
                                   <text x={center} y="207" textAnchor="middle">
                                     {month.label}
                                   </text>
@@ -2785,9 +2875,15 @@ function AppShell() {
                     <div className="panel-header">
                       <div>
                         <h2>Monthly balance trend</h2>
-                        <p>Estimated from your current balance and transaction history</p>
+                        <p>
+                          Estimated from your current balance and transaction
+                          history
+                        </p>
                       </div>
-                      <TrendingUp size={19} className="analytics-heading-icon" />
+                      <TrendingUp
+                        size={19}
+                        className="analytics-heading-icon"
+                      />
                     </div>
                     {accountLoading ? (
                       <div className="chart-empty-state" role="status">
@@ -2820,10 +2916,14 @@ function AppShell() {
                               points={monthlyActivity
                                 .map((month, index) => {
                                   const x =
-                                    42 + (662 / (monthlyActivity.length - 1)) * index;
+                                    42 +
+                                    (662 / (monthlyActivity.length - 1)) *
+                                      index;
                                   const y =
                                     180 -
-                                    ((month.balance - balanceMin) / balanceSpan) * 145;
+                                    ((month.balance - balanceMin) /
+                                      balanceSpan) *
+                                      145;
                                   return `${x},${y}`;
                                 })
                                 .join(" ")}
@@ -2833,14 +2933,18 @@ function AppShell() {
                             const x =
                               monthlyActivity.length === 1
                                 ? 373
-                                : 42 + (662 / (monthlyActivity.length - 1)) * index;
+                                : 42 +
+                                  (662 / (monthlyActivity.length - 1)) * index;
                             const y =
-                              180 - ((month.balance - balanceMin) / balanceSpan) * 145;
+                              180 -
+                              ((month.balance - balanceMin) / balanceSpan) *
+                                145;
 
                             return (
                               <g key={month.date.toISOString()}>
                                 <title>
-                                  {month.label}: estimated balance {formatMoney(month.balance)}
+                                  {month.label}: estimated balance{" "}
+                                  {formatMoney(month.balance)}
                                 </title>
                                 <circle
                                   className="balance-trend-point"
@@ -2848,7 +2952,8 @@ function AppShell() {
                                   cy={y}
                                   r="5"
                                 />
-                                {(monthlyActivity.length <= 8 || index % 2 === 0) && (
+                                {(monthlyActivity.length <= 8 ||
+                                  index % 2 === 0) && (
                                   <text x={x} y="207" textAnchor="middle">
                                     {month.label}
                                   </text>
@@ -2860,7 +2965,8 @@ function AppShell() {
                       </div>
                     )}
                     <p className="chart-disclaimer">
-                      Historical balances are estimates based on the transactions available.
+                      Historical balances are estimates based on the
+                      transactions available.
                     </p>
                   </section>
                 )}
@@ -2879,7 +2985,10 @@ function AppShell() {
                           <h2>Spending categories</h2>
                           <p>Completed debits · selected period</p>
                         </div>
-                        <Activity size={19} className="analytics-heading-icon" />
+                        <Activity
+                          size={19}
+                          className="analytics-heading-icon"
+                        />
                       </div>
                       {categoryTotals.length === 0 ? (
                         <div className="empty-state">
@@ -2891,11 +3000,15 @@ function AppShell() {
                             <div className="category-row" key={category.name}>
                               <div className="category-row-heading">
                                 <span>
-                                  <i style={{ backgroundColor: category.color }} />
+                                  <i
+                                    style={{ backgroundColor: category.color }}
+                                  />
                                   {category.name}
                                 </span>
                                 <strong>
-                                  {showBalance ? formatMoney(category.amount) : maskedBalance}
+                                  {showBalance
+                                    ? formatMoney(category.amount)
+                                    : maskedBalance}
                                 </strong>
                               </div>
                               <div
@@ -2937,7 +3050,10 @@ function AppShell() {
                             customerAccount ? "active" : "unavailable"
                           }`}
                         >
-                          <span className="account-status-indicator" aria-hidden="true" />
+                          <span
+                            className="account-status-indicator"
+                            aria-hidden="true"
+                          />
                           {customerAccount
                             ? "Active"
                             : accountLoading
@@ -2970,7 +3086,8 @@ function AppShell() {
                             <div>
                               <strong>{customerAccount.account_name}</strong>
                               <span>
-                                {customerAccount.account_type} account · {customerAccount.currency}
+                                {customerAccount.account_type} account ·{" "}
+                                {customerAccount.currency}
                               </span>
                             </div>
                           </div>
@@ -2978,7 +3095,9 @@ function AppShell() {
                           <div className="account-detail-row">
                             <span>Account number</span>
                             <span className="account-number-value">
-                              <strong>•••• {customerAccount.account_number.slice(-4)}</strong>
+                              <strong>
+                                •••• {customerAccount.account_number.slice(-4)}
+                              </strong>
                               <button
                                 type="button"
                                 className="account-copy-button"
@@ -3012,7 +3131,6 @@ function AppShell() {
                       )}
                     </section>
                   )}
-
                 </div>
               </div>
             )}
@@ -3098,11 +3216,21 @@ function AppShell() {
                           className="balance-visibility account-balance-visibility"
                           onClick={() => setShowBalance((current) => !current)}
                           aria-label={
-                            showBalance ? "Hide account balances" : "Show account balances"
+                            showBalance
+                              ? "Hide account balances"
+                              : "Show account balances"
                           }
-                          title={showBalance ? "Hide account balances" : "Show account balances"}
+                          title={
+                            showBalance
+                              ? "Hide account balances"
+                              : "Show account balances"
+                          }
                         >
-                          {showBalance ? <Eye size={17} /> : <EyeOff size={17} />}
+                          {showBalance ? (
+                            <Eye size={17} />
+                          ) : (
+                            <EyeOff size={17} />
+                          )}
                         </button>
                       </div>
                       <strong>
@@ -3156,7 +3284,9 @@ function AppShell() {
 
               <div className="transaction-filters">
                 <label className="transaction-search-label">
-                  <span className="sr-only">Search transaction descriptions</span>
+                  <span className="sr-only">
+                    Search transaction descriptions
+                  </span>
                   <Search size={17} aria-hidden="true" />
                   <input
                     className="transaction-search-input"
@@ -3194,10 +3324,7 @@ function AppShell() {
                     onChange={(event) =>
                       setTransactionStatusFilter(
                         event.target.value as
-                          | "all"
-                          | "pending"
-                          | "completed"
-                          | "failed",
+                          "all" | "pending" | "completed" | "failed",
                       )
                     }
                   >
@@ -3314,7 +3441,9 @@ function AppShell() {
                       : ""
                   }
                 >
-                  {selectedTransaction.transaction_type === "credit" ? "+" : "−"}
+                  {selectedTransaction.transaction_type === "credit"
+                    ? "+"
+                    : "−"}
                   {showBalance
                     ? formatMoney(Math.abs(Number(selectedTransaction.amount)))
                     : maskedBalance}
@@ -3393,7 +3522,10 @@ function AppShell() {
               <div className="panel-header">
                 <div>
                   <h2>Personal information</h2>
-                  <p>Update the name shown on your profile — saved automatically as you type</p>
+                  <p>
+                    Update the name shown on your profile — saved automatically
+                    as you type
+                  </p>
                 </div>
                 <UserRound size={22} />
               </div>
@@ -3465,7 +3597,6 @@ function AppShell() {
                 </p>
               </form>
             </section>
-
           </section>
         )}
 
@@ -3498,7 +3629,11 @@ function AppShell() {
                       : 2;
                 const isComplete = index < stepNumber;
                 const isCurrent = index === stepNumber;
-                const labels = ["Recipient & amount", "Review details", "Confirmation"];
+                const labels = [
+                  "Recipient & amount",
+                  "Review details",
+                  "Confirmation",
+                ];
 
                 return (
                   <li
@@ -3511,7 +3646,9 @@ function AppShell() {
                     <span className="transfer-progress-number">
                       {isComplete ? <CheckCircle2 size={16} /> : index + 1}
                     </span>
-                    <span className="transfer-progress-label">{labels[index]}</span>
+                    <span className="transfer-progress-label">
+                      {labels[index]}
+                    </span>
                   </li>
                 );
               })}
@@ -3539,12 +3676,17 @@ function AppShell() {
 
                 {transferStep === "confirmed" ? (
                   <div className="transfer-confirmation">
-                    <div className="transfer-confirmation-icon" aria-hidden="true">
+                    <div
+                      className="transfer-confirmation-icon"
+                      aria-hidden="true"
+                    >
                       <CheckCircle2 size={26} />
                     </div>
                     <h3>Transfer confirmed</h3>
                     <p>
-                      Your Transfer request for {transferForm.recipientName || "the recipient"} has been Completed.
+                      Your Transfer request for{" "}
+                      {transferForm.recipientName || "the recipient"} has been
+                      Completed.
                     </p>
                     <div className="transfer-reference">
                       <span>Status</span>
@@ -3568,7 +3710,9 @@ function AppShell() {
                       <div className="saved-beneficiaries-header">
                         <div>
                           <strong>Saved beneficiaries</strong>
-                          <span>Choose a recipient to fill in their details</span>
+                          <span>
+                            Choose a recipient to fill in their details
+                          </span>
                         </div>
                         <button
                           type="button"
@@ -3587,7 +3731,10 @@ function AppShell() {
                             className="beneficiary-item"
                             onClick={() => applyBeneficiary(beneficiary)}
                           >
-                            <span className="beneficiary-avatar" aria-hidden="true">
+                            <span
+                              className="beneficiary-avatar"
+                              aria-hidden="true"
+                            >
                               {beneficiary.nickname.slice(0, 1).toUpperCase()}
                             </span>
                             <span className="beneficiary-copy">
@@ -3647,7 +3794,7 @@ function AppShell() {
                             </label>
 
                             <label>
-                                <span>Account number</span>
+                              <span>Account number</span>
                               <input
                                 type="text"
                                 inputMode="numeric"
@@ -3663,7 +3810,7 @@ function AppShell() {
                             </label>
 
                             <label>
-                                <span>Routing number</span>
+                              <span>Routing number</span>
                               <input
                                 type="text"
                                 inputMode="numeric"
@@ -3721,7 +3868,9 @@ function AppShell() {
                             <button
                               type="button"
                               className="button-secondary"
-                              onClick={() => setTransferForm(initialTransferForm)}
+                              onClick={() =>
+                                setTransferForm(initialTransferForm)
+                              }
                             >
                               Clear
                             </button>
@@ -3743,7 +3892,10 @@ function AppShell() {
                             </div>
                             <div>
                               <span>Account</span>
-                              <strong>•••• {transferForm.accountNumber.slice(-4) || "0000"}</strong>
+                              <strong>
+                                ••••{" "}
+                                {transferForm.accountNumber.slice(-4) || "0000"}
+                              </strong>
                             </div>
                             <div>
                               <span>Routing</span>
@@ -3751,11 +3903,15 @@ function AppShell() {
                             </div>
                             <div>
                               <span>Amount</span>
-                              <strong>{formatMoney(Number(transferForm.amount || 0))}</strong>
+                              <strong>
+                                {formatMoney(Number(transferForm.amount || 0))}
+                              </strong>
                             </div>
                             <div>
                               <span>Remark</span>
-                              <strong>{transferForm.remark || "No remark added"}</strong>
+                              <strong>
+                                {transferForm.remark || "No remark added"}
+                              </strong>
                             </div>
                           </div>
 
@@ -3806,7 +3962,9 @@ function AppShell() {
                   </strong>
                 </div>
                 <p className="transfer-request-note">
-                  The displayed balance and transaction history update immediately. Requests are not submitted to your bank and no external funds are moved.
+                  The displayed balance and transaction history update
+                  immediately. Requests are not submitted to your bank and no
+                  external funds are moved.
                 </p>
               </aside>
             </div>
@@ -3834,9 +3992,7 @@ function AppShell() {
                   className={`debit-card-visual ${
                     cardFrozen ? "is-frozen" : ""
                   }`}
-                  aria-label={`Debit card, ${
-                    cardFrozen ? "frozen" : "active"
-                  }`}
+                  aria-label={`Debit card, ${cardFrozen ? "frozen" : "active"}`}
                 >
                   <div className="debit-card-topline">
                     <span className="debit-card-brand">GUARDIAN</span>
@@ -3901,9 +4057,7 @@ function AppShell() {
                       }`}
                     />
                     <div>
-                      <strong>
-                        {cardFrozen ? "Frozen" : "Active"}
-                      </strong>
+                      <strong>{cardFrozen ? "Frozen" : "Active"}</strong>
                       <small>
                         {customerAccount
                           ? `${customerAccount.account_type} account linked`
@@ -3946,7 +4100,10 @@ function AppShell() {
                     <h2>Spending limits</h2>
                     <p>Manage spending limits and review completed debits</p>
                   </div>
-                  <SlidersHorizontal size={20} className="analytics-heading-icon" />
+                  <SlidersHorizontal
+                    size={20}
+                    className="analytics-heading-icon"
+                  />
                 </div>
 
                 <div className="card-spend-summary">
@@ -4092,11 +4249,7 @@ function AppShell() {
                     setShowCardDetails((visible) => !visible);
                   }}
                 >
-                  {showCardDetails ? (
-                    <EyeOff size={16} />
-                  ) : (
-                    <Eye size={16} />
-                  )}
+                  {showCardDetails ? <EyeOff size={16} /> : <Eye size={16} />}
                   {showCardDetails ? "Hide card details" : "Show card details"}
                 </button>
               </div>
@@ -4159,7 +4312,9 @@ function AppShell() {
 
               <label className="support-faq-search">
                 <Search size={17} aria-hidden="true" />
-                <span className="sr-only">Search frequently asked questions</span>
+                <span className="sr-only">
+                  Search frequently asked questions
+                </span>
                 <input
                   type="search"
                   value={faqSearch}
@@ -4355,6 +4510,68 @@ function AppShell() {
           </span>
         </footer>
       </main>
+
+      <nav className="bottom-nav" aria-label="Main navigation">
+        {bottomNavigation.map(({ name, icon: Icon }) => (
+          <button
+            type="button"
+            key={name}
+            className={`bottom-nav-item ${activePage === name ? "active" : ""}`}
+            aria-current={activePage === name ? "page" : undefined}
+            onClick={() => navigate(name)}
+          >
+            <Icon size={20} />
+            <span>{name}</span>
+          </button>
+        ))}
+        <button
+          type="button"
+          className={`bottom-nav-item ${bottomNavMoreOpen ? "active" : ""}`}
+          aria-haspopup="menu"
+          aria-expanded={bottomNavMoreOpen}
+          onClick={() => setBottomNavMoreOpen((open) => !open)}
+        >
+          <MoreHorizontal size={20} />
+          <span>More</span>
+        </button>
+      </nav>
+      {bottomNavMoreOpen && (
+        <div
+          className="bottom-nav-more"
+          role="menu"
+          aria-label="More navigation"
+        >
+          {moreNavigation.map(({ name, icon: Icon }) => (
+            <button
+              type="button"
+              key={name}
+              role="menuitem"
+              className={`bottom-nav-more-item ${
+                activePage === name ? "active" : ""
+              }`}
+              onClick={() => {
+                navigate(name);
+                setBottomNavMoreOpen(false);
+              }}
+            >
+              <Icon size={18} />
+              <span>{name}</span>
+            </button>
+          ))}
+          <button
+            type="button"
+            role="menuitem"
+            className="bottom-nav-more-item sign-out"
+            onClick={() => {
+              setBottomNavMoreOpen(false);
+              handleSignOut();
+            }}
+          >
+            <LogOut size={18} />
+            <span>Sign out</span>
+          </button>
+        </div>
+      )}
     </div>
   );
 }
